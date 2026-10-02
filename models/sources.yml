@@ -1,0 +1,28 @@
+version: 2
+
+sources:
+  - name: ods
+    schema: main
+    tables:
+      - name: raw_twitch
+        description: >
+          Raw Twitch chat-presence records from the 100k-user subset
+          (Rappaz, McAuley and Aberer, RecSys 2021), loaded as-is from 100k_a.csv.
+          One time step = 10 minutes; 6148 steps (about 43 days).
+          Every user has at least 5 records (observed minimum = 5),
+          which suggests an activity filter was applied when sampling users.
+        columns:
+          - name: user_id
+            data_tests: [not_null]
+          - name: stream_id
+            data_tests: [not_null]
+          - name: streamer
+            data_tests: [not_null]
+  - name: criteo
+    description: Criteo Attribution Modeling for Bidding dataset, a 30-day sample of display ad traffic. One row per impression.
+    meta:
+      external_location: "data/raw/criteo/{name}.parquet"
+    tables:
+      - name: criteo_attribution
+        description: Raw impressions. The value -1 is used as a sentinel for missing values.           
+ 

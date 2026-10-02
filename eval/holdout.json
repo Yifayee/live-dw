@@ -1,0 +1,18 @@
+[
+  {"id": "h01", "question": "How many streams did shroud have in total?",
+   "gold_sql": "SELECT n_streams FROM dim_streamer WHERE streamer = 'shroud'"},
+  {"id": "h02", "question": "What was the total watch time in hours on day 12?",
+   "gold_sql": "SELECT watch_min / 60.0 FROM ads_platform_daily WHERE day_index = 12"},
+  {"id": "h03", "question": "On average, how many days was each user active?",
+   "gold_sql": "SELECT AVG(active_days) FROM dim_user"},
+  {"id": "h04", "question": "Which streamer had the most viewers on day 30?",
+   "gold_sql": "SELECT streamer FROM dws_streamer_day WHERE day_index = 30 ORDER BY n_viewers DESC LIMIT 1"},
+  {"id": "h05", "question": "How many users were first observed on day 0?",
+   "gold_sql": "SELECT COUNT(*) FROM dim_user WHERE first_day = 0"},
+  {"id": "h06", "question": "What is the average 7-day retention across all cohorts where it is available?",
+   "gold_sql": "SELECT AVG(retention_d7) FROM ads_user_retention WHERE retention_d7 IS NOT NULL"},
+  {"id": "h07", "question": "How many streamers did the average user watch over the whole period?",
+   "gold_sql": "SELECT AVG(n_streamers_watched) FROM dim_user"},
+  {"id": "h08", "question": "What was the total watch time in minutes for tfue across all days?",
+   "gold_sql": "SELECT total_watch_min FROM dim_streamer WHERE streamer = 'tfue'"}
+]

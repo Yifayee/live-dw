@@ -1,0 +1,142 @@
+id,question,status,pred_sql,error
+q01,Which full day had the highest DAU?,correct,"WITH full_days AS (
+  SELECT day_index, dau
+  FROM ads_platform_daily
+  WHERE is_full_day = true
+)
+SELECT day_index, dau
+FROM full_days
+ORDER BY dau DESC
+LIMIT 1;",
+q02,Which day had the lowest DAU?,correct,"WITH full_days AS (
+  SELECT day_index, dau, is_full_day
+  FROM ads_platform_daily
+  WHERE is_full_day = true
+)
+SELECT day_index, dau
+FROM full_days
+ORDER BY dau ASC
+LIMIT 1;",
+q03,What was the highest number of users online at the same time over the whole period?,correct,"SELECT MAX(concurrent_users) as max_concurrent_users
+FROM ads_platform_concurrency;",
+q04,What is the average DAU across full days?,correct,"WITH full_days AS (
+  SELECT dau
+  FROM ads_platform_daily
+  WHERE is_full_day = true
+)
+SELECT AVG(dau) AS avg_dau
+FROM full_days;",
+q05,List the top 5 streamers by number of unique viewers.,correct,"WITH ranked_streamers AS (
+  SELECT 
+    streamer,
+    n_unique_viewers,
+    ROW_NUMBER() OVER (ORDER BY n_unique_viewers DESC) AS rank
+  FROM dim_streamer
+)
+SELECT 
+  streamer,
+  n_unique_viewers
+FROM ranked_streamers
+WHERE rank <= 5
+ORDER BY rank;",
+q06,How many users were active on every day in the data?,correct,"WITH user_days AS (
+  SELECT user_id, COUNT(DISTINCT day_index) as days_active
+  FROM dws_user_day
+  GROUP BY user_id
+)
+SELECT COUNT(*) as users_active_every_day
+FROM user_days
+WHERE days_active = (SELECT COUNT(DISTINCT day_index) FROM dws_user_day);",
+q07,How many streamers had more than 100 streams?,correct,"SELECT COUNT(*) as streamers_with_more_than_100_streams
+FROM dim_streamer
+WHERE n_streams > 100;",
+q08,How many hours in total did sampled users spend in ninja's chat?,correct,"WITH ninja_sessions AS (
+  SELECT duration_min
+  FROM dwd_watch_session
+  WHERE streamer = 'ninja'
+)
+SELECT SUM(duration_min) / 60.0 AS total_hours
+FROM ninja_sessions;",
+q09,What is the next-day retention rate of users first seen on day 1?,correct,"WITH cohort_day_1 AS (
+  SELECT retention_d1
+  FROM ads_user_retention
+  WHERE cohort_day = 1
+)
+SELECT retention_d1
+FROM cohort_day_1;",
+q10,Which cohort day has the highest 7-day retention?,correct,"WITH ranked_cohorts AS (
+  SELECT
+    cohort_day,
+    retention_d7,
+    ROW_NUMBER() OVER (ORDER BY retention_d7 DESC NULLS LAST) AS rank
+  FROM ads_user_retention
+  WHERE cohort_day > 0
+    AND retention_d7 IS NOT NULL
+)
+SELECT cohort_day
+FROM ranked_cohorts
+WHERE rank = 1;",
+q11,What is the median number of sessions per user?,correct,"WITH user_session_counts AS (
+  SELECT n_sessions
+  FROM dim_user
+)
+SELECT PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY n_sessions) AS median_sessions_per_user
+FROM user_session_counts",
+q12,How many streamers were active on day 20?,correct,"WITH full_days AS (
+  SELECT last_full_day FROM dim_data_window
+)
+SELECT COUNT(DISTINCT streamer) AS active_streamers
+FROM dws_streamer_day
+WHERE day_index = 20
+  AND day_index <= (SELECT last_full_day FROM full_days);",
+q13,How many users were first seen after day 30?,correct,"WITH user_first_days AS (
+  SELECT user_id, first_day
+  FROM dim_user
+  WHERE first_day > 30
+)
+SELECT COUNT(DISTINCT user_id) AS users_first_seen_after_day_30
+FROM user_first_days;",
+q14,"Among full days, which day had the highest average watch time per active user?",correct,"WITH full_days AS (
+  SELECT day_index, avg_watch_min_per_dau
+  FROM ads_platform_daily
+  WHERE is_full_day = true
+)
+SELECT day_index, avg_watch_min_per_dau
+FROM full_days
+ORDER BY avg_watch_min_per_dau DESC
+LIMIT 1",
+q15,How many distinct users watched ninja on day 10?,correct,"SELECT n_viewers
+FROM dws_streamer_day
+WHERE streamer = 'ninja' AND day_index = 10;",
+q16,Which streamer had the most total watch minutes on day 5?,correct,"SELECT streamer, watch_min
+FROM dws_streamer_day
+WHERE day_index = 5
+ORDER BY watch_min DESC
+LIMIT 1;",
+q17,How many users watched more than 50 different streamers?,correct,"WITH user_streamer_counts AS (
+  SELECT user_id, COUNT(DISTINCT streamer) as n_streamers
+  FROM dwd_watch_session
+  GROUP BY user_id
+)
+SELECT COUNT(*) as num_users
+FROM user_streamer_counts
+WHERE n_streamers > 50;",
+q18,What is the longest single viewing session in minutes?,correct,SELECT MAX(duration_min) AS longest_session_min FROM dwd_watch_session;,
+q19,On which day did the overall peak concurrency occur?,correct,"WITH daily_pcu AS (
+  SELECT day_index, pcu
+  FROM ads_platform_daily
+  WHERE is_full_day = TRUE
+)
+SELECT day_index
+FROM daily_pcu
+WHERE pcu = (SELECT MAX(pcu) FROM daily_pcu)
+LIMIT 1;",
+q20,"How many days does the data cover, and how many of them are full days?",correct,"WITH data_extent AS (
+  SELECT
+    (SELECT last_step FROM dim_data_window) as last_step,
+    (SELECT last_full_day FROM dim_data_window) as last_full_day
+)
+SELECT
+  (last_step // 144) + 1 as total_days,
+  (last_full_day) + 1 as full_days
+FROM data_extent;",

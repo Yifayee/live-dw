@@ -1,0 +1,7 @@
+live_dw:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: warehouse.duckdb
+      threads: 1

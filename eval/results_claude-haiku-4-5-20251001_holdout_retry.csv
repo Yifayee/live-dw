@@ -1,0 +1,53 @@
+id,question,status,retried,pred_sql,error
+h01,How many streams did shroud have in total?,wrong,False,SELECT total_watch_min FROM dim_streamer WHERE streamer = 'shroud',
+h02,What was the total watch time in hours on day 12?,correct,False,"WITH full_days AS (
+  SELECT day_index, watch_min
+  FROM ads_platform_daily
+  WHERE day_index = 12 AND is_full_day = TRUE
+)
+SELECT watch_min / 60.0 AS watch_time_hours
+FROM full_days;",
+h03,"On average, how many days was each user active?",correct,False,"WITH user_stats AS (
+  SELECT
+    active_days
+  FROM dim_user
+)
+SELECT
+  AVG(CAST(active_days AS DOUBLE)) AS avg_active_days_per_user
+FROM user_stats",
+h04,Which streamer had the most viewers on day 30?,correct,False,"WITH day_30_stats AS (
+  SELECT 
+    streamer,
+    n_viewers
+  FROM dws_streamer_day
+  WHERE day_index = 30
+)
+SELECT 
+  streamer,
+  n_viewers
+FROM day_30_stats
+ORDER BY n_viewers DESC
+LIMIT 1;",
+h05,How many users were first observed on day 0?,correct,False,"SELECT COUNT(*) as users_first_observed_day_0
+FROM dim_user
+WHERE first_day = 0;",
+h06,What is the average 7-day retention across all cohorts where it is available?,correct,False,"WITH valid_retention AS (
+  SELECT retention_d7
+  FROM ads_user_retention
+  WHERE retention_d7 IS NOT NULL
+)
+SELECT AVG(retention_d7) AS avg_d7_retention
+FROM valid_retention;",
+h07,How many streamers did the average user watch over the whole period?,correct,False,"WITH user_streamer_counts AS (
+  SELECT
+    user_id,
+    n_streamers_watched
+  FROM dim_user
+)
+SELECT
+  AVG(n_streamers_watched) AS avg_streamers_per_user
+FROM user_streamer_counts;",
+h08,What was the total watch time in minutes for tfue across all days?,correct,False,"SELECT
+  SUM(total_watch_min) AS total_watch_min
+FROM dim_streamer
+WHERE streamer = 'tfue';",

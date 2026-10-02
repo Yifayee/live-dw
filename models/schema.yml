@@ -1,0 +1,323 @@
+version: 2
+
+models:
+  - name: dwd_watch_session
+    description: >
+      Cleaned viewing records. Grain: one row per (user_id, stream_id).
+      A viewer is a user present in the stream's chat (crawled every 10 minutes),
+      not every person watching.
+    columns:
+      - name: user_id
+        description: Anonymized user ID from the 100k sampled users.
+        data_tests: [not_null]
+      - name: stream_id
+        description: ID of a single broadcast; maps to exactly one streamer.
+        data_tests: [not_null]
+      - name: streamer
+        description: Streamer username.
+      - name: start_step
+        description: First 10-minute step at which the user was seen in the chat.
+      - name: stop_step
+        description: Step at which the user was no longer seen (exclusive end).
+      - name: duration_steps
+        description: stop_step - start_step, in 10-minute steps.
+      - name: duration_min
+        description: (stop_step - start_step) * 10. Resolution is 10 minutes.
+        data_tests: [not_null]
+      - name: day_index
+        description: start_step // 144. Relative day 0-42, not a calendar date.
+
+  - name: dwd_ad_impression
+    description: Cleaned ad impressions from Criteo. One row per impression; sentinel -1 values converted to NULL.
+    columns:
+      - name: impression_id
+        description: md5 hash of (timestamp, uid, campaign); unique per impression.
+        data_tests: [unique, not_null]
+      - name: user_id
+        data_tests: [not_null]
+      - name: campaign_id
+        data_tests: [not_null]
+      - name: cost
+        description: Transformed cost per impression, not the real price.
+        data_tests: [not_null]
+      - name: is_conversion_journey
+        data_tests: [not_null]
+
+  - name: dwd_ad_conversion
+    description: >
+      One row per conversion, keyed by (conversion_id, user_id). conversion_id alone is
+      not unique: 2,910 source IDs are shared by different users with different conversion
+      times. campaign_id, conversion_ts_sec and is_attributed are constant within each key.
+      Journeys near the start of the window miss clicks before day 0, so n_journey_clicks
+      is lower for early conversions (left truncation).
+    columns:
+      - name: conversion_key
+        description: md5 hash of (conversion_id, user_id); unique per conversion.
+        data_tests: [unique, not_null]
+      - name: conversion_id
+        description: Source conversion ID. Not unique on its own.
+        data_tests: [not_null]
+      - name: user_id
+        data_tests: [not_null]
+      - name: campaign_id
+        description: Each conversion journey belongs to exactly one campaign.
+        data_tests: [not_null]
+      - name: conversion_ts_sec
+        description: Conversion time in relative seconds.
+        data_tests: [not_null]
+      - name: n_journey_clicks
+        description: Clicked impressions on the journey observed inside the window.
+      - name: conversion_lag_sec
+        description: Seconds from the last in-window click on the journey to the conversion.
+      - name: is_shared_conversion_id
+        description: True if this conversion_id is also used by another user (source ID collision).
+
+  - name: dim_user
+    description: >
+      One row per user. first_day is the first observed day, not a signup date;
+      users seen on day 0 are left-censored (may have been active before the window).
+    columns:
+      - name: user_id
+        description: Anonymized user ID.
+        data_tests: [unique, not_null]
+      - name: first_day
+        description: First day the user appears in the 43-day window.
+      - name: last_day
+        description: Last day the user appears in the window.
+      - name: active_days
+        description: Number of distinct days with at least one session.
+      - name: n_sessions
+        description: Number of viewing records (one per user x broadcast) over the whole period.
+      - name: n_streamers_watched
+        description: Number of distinct streamers the user watched over the whole period.
+
+  - name: dim_streamer
+    description: >
+      One row per streamer. Viewer counts and watch time cover the 100k sampled
+      users only, not the streamer's full audience.
+    columns:
+      - name: streamer
+        description: Streamer username.
+        data_tests: [unique, not_null]
+      - name: first_day
+        description: First day the streamer appears in the window.
+      - name: last_day
+        description: Last day the streamer appears in the window.
+      - name: n_streams
+        description: >
+          Number of broadcasts (distinct stream_id), i.e. how many times the streamer
+          went live. Use this for "how many streams" questions.
+      - name: n_unique_viewers
+        description: Distinct sampled users who watched this streamer over the whole period.
+      - name: total_watch_min
+        description: >
+          Total minutes sampled users spent in this streamer's chats (watch time,
+          not a count of streams).
+
+  - name: dim_data_window
+    description: >
+      Single-row table describing the observed data window. Shared by ADS models
+      so the partial-day rule is defined once. last_step = 6148 for the 100k subset.
+    columns:
+      - name: last_step
+        description: Last recorded time step.
+      - name: partial_day
+        description: The day containing the last step; it is incomplete.
+      - name: last_full_day
+        description: Last complete day in the window.
+        data_tests: [not_null]
+
+  - name: dim_ad_data_window
+    description: >
+      Single-row table describing the observed Criteo ad data window. Shared by ad DWS
+      and ADS models so the partial-day and maturity rules are defined once. Click days
+      after last_mature_day are biased upward in conversion metrics because journeys with
+      later clicks outside the window are credited to their last in-window click.
+    columns:
+      - name: last_ts
+        description: Last impression timestamp in relative seconds.
+      - name: last_day
+        description: Day containing the last impression; may be partial.
+      - name: last_full_day
+        description: Last complete day in the window.
+        data_tests: [not_null]
+      - name: maturity_days
+        description: Days excluded at the end of the window (var ad_maturity_days, default 7).
+      - name: last_mature_day
+        description: last_full_day - maturity_days. Click-date conversion metrics are comparable up to this day.
+        data_tests: [not_null]
+
+  - name: dws_user_day
+    description: >
+      One row per (user_id, day_index). Sessions are assigned to the day they start.
+      watch_min may double count users present in several chats at the same time.
+    columns:
+      - name: user_id
+        description: Anonymized user ID.
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_user')
+                field: user_id
+      - name: day_index
+        description: Relative day 0-42.
+      - name: n_sessions
+        description: Viewing records starting that day.
+      - name: n_streamers
+        description: Distinct streamers watched that day. Not additive across days.
+      - name: watch_min
+        description: Minutes in chats for sessions starting that day.
+
+  - name: dws_streamer_day
+    description: One row per (streamer, day_index).
+    columns:
+      - name: streamer
+        description: Streamer username.
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_streamer')
+                field: streamer
+      - name: day_index
+        description: Relative day 0-42.
+      - name: n_streams
+        description: >
+          Distinct broadcasts with sessions starting that day. A broadcast crossing
+          midnight is counted on both days, so do not sum across days; use
+          dim_streamer.n_streams for totals.
+      - name: n_viewers
+        description: >
+          Distinct viewers that day. Not additive across days; use
+          dim_streamer.n_unique_viewers for whole-period totals.
+      - name: n_sessions
+        description: Viewing records starting that day.
+      - name: watch_min
+        description: Minutes in chats for sessions starting that day.
+
+  - name: dws_ad_campaign_day
+    description: >
+      One row per (campaign_id, day_index). Additive measures only; compute CTR, CVR
+      and CPA in ADS from summed numerators and denominators. Conversions are assigned
+      to the day of the last click on the journey (click-date attribution).
+    columns:
+      - name: campaign_id
+        data_tests: [not_null]
+      - name: day_index
+        description: Relative day 0-30 (impression_ts_sec // 86400), not a calendar date.
+        data_tests: [not_null]
+      - name: impressions
+        description: Impressions served that day.
+      - name: clicks
+        description: Clicked impressions that day.
+      - name: cost
+        description: Transformed cost, not the real price.
+      - name: reach_users
+        description: Distinct users reached that day. Not additive across days.
+      - name: conversions
+        description: Conversions whose last in-window click happened that day.
+      - name: attributed_conversions
+        description: Conversions attributed to Criteo by the advertiser.
+      - name: is_full_day
+        description: False only for the partial last day of the data window.
+      - name: is_mature_day
+        description: True if day_index <= dim_ad_data_window.last_mature_day.
+
+  - name: ads_platform_concurrency
+    description: >
+      Users online per 10-minute step, computed with +1/-1 start/stop events and
+      a running sum. Assumes a user is online during [start_step, stop_step).
+      Steps without events are omitted; concurrency is unchanged across them.
+    columns:
+      - name: step
+        description: 10-minute time step.
+      - name: day_index
+        description: step // 144.
+      - name: concurrent_users
+        description: Sampled users online in chats at this step.
+
+  - name: ads_platform_daily
+    description: >
+      Daily platform metrics: DAU, active streamers, PCU, sessions, watch time.
+      Day 42 is partial (about 69% of a day); filter with is_full_day.
+    columns:
+      - name: day_index
+        description: Relative day 0-42.
+        data_tests: [unique, not_null]
+      - name: dau
+        description: Users with at least one session starting that day.
+      - name: active_streamers
+        description: Streamers with at least one session starting that day.
+      - name: pcu
+        description: Peak concurrent chat users that day, from ads_platform_concurrency.
+      - name: sessions
+        description: Viewing records starting that day.
+      - name: watch_min
+        description: Total minutes in chats for sessions starting that day.
+      - name: avg_watch_min_per_dau
+        description: watch_min / dau.
+      - name: is_full_day
+        description: False only for the partial last day.
+
+  - name: ads_user_retention
+    description: >
+      D1 and D7 retention by first observed day (cohort). Retention means active
+      on exactly day d+1 or d+7, so D7 can exceed D1. Day 0 excluded (left-censored);
+      rates whose target day is beyond the last full day are NULL.
+      Later cohorts are biased upward because every sampled user has at least 5 records.
+    columns:
+      - name: cohort_day
+        description: First observed day of the users in this cohort.
+        data_tests: [unique, not_null]
+      - name: cohort_size
+        description: Number of users in the cohort.
+      - name: retention_d1
+        description: Share of the cohort active on day cohort_day + 1.
+      - name: retention_d7
+        description: Share of the cohort active on day cohort_day + 7.
+
+  - name: ads_ad_daily
+    description: >
+      Daily ad platform metrics across all campaigns. Ratios are computed from summed
+      numerators and denominators. Day 30 is partial; filter with is_full_day. Conversion
+      metrics (cvr, cpa, attribution_rate) on immature days are biased upward; filter with
+      is_mature_day before comparing days. Daily reach is not included because
+      per-campaign reach cannot be summed.
+    columns:
+      - name: day_index
+        description: Relative day 0-30.
+        data_tests: [unique, not_null]
+      - name: active_campaigns
+        description: Campaigns with at least one impression that day.
+      - name: ctr
+        description: clicks / impressions.
+      - name: cvr
+        description: conversions / clicks (click-date attribution).
+      - name: cpa
+        description: cost / conversions. Cost is transformed, so compare relatively only.
+      - name: cpm
+        description: 1000 * cost / impressions.
+      - name: attribution_rate
+        description: attributed_conversions / conversions.
+      - name: is_full_day
+        description: False only for the partial last day.
+      - name: is_mature_day
+        description: True if conversion metrics for this day are not affected by end-of-window truncation.
+
+  - name: ads_ad_campaign_performance
+    description: >
+      One row per campaign over mature days only, with CTR, CVR, CPA, CPM and share of cost.
+      Campaigns below the conversion threshold (var ad_min_conversions_for_rank, default 30)
+      get a NULL cpa_rank because their CPA is too noisy to compare.
+    columns:
+      - name: campaign_id
+        data_tests: [unique, not_null]
+      - name: active_days
+        description: Mature days with at least one impression.
+      - name: cpa
+        description: cost / conversions; NULL if the campaign has no conversions.
+      - name: is_rankable
+        description: True if conversions meet the ranking threshold.
+      - name: cpa_rank
+        description: Rank by CPA ascending among rankable campaigns (1 = cheapest per conversion).
+      - name: share_of_cost
+        description: This campaign's share of total cost over mature days.

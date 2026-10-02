@@ -1,0 +1,8 @@
+name: live_dw
+version: "1.0.0"
+profile: live_dw
+model-paths: ["models"]
+
+models:
+  live_dw:
+    +materialized: table

@@ -1,0 +1,23 @@
+# Data and local databases
+data/
+*.duckdb
+*.duckdb.wal
+*.parquet
+
+# dbt artifacts
+target/
+dbt_packages/
+logs/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Secrets
+.env
+
+# OS
+.DS_Store
+.user.yml
+.user.yml
