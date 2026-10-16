@@ -1,0 +1,47 @@
+{
+  "run_id": "clean2_d10_16",
+  "steps": [
+    1440,
+    2448
+  ],
+  "windows": 1008,
+  "windows_matched": 1008,
+  "window_match_rate": 1.0,
+  "event_abs_diff": 0,
+  "event_abs_diff_rate": 0.0,
+  "categories": {
+    "match": {
+      "windows": 1008,
+      "events": 0
+    }
+  },
+  "diff_distribution_windows": {
+    "0": 1008
+  },
+  "batch_check": {
+    "ads_vs_dwd_recompute_equal_windows": 1008,
+    "ads_steps_forward_filled": 0,
+    "ads_concurrent_sum": 1457071,
+    "dwd_sessions_sum": 1457071
+  },
+  "stream_totals": {
+    "sessions_online": 1457071,
+    "users_online": 1402365,
+    "events_raw": 1457071
+  },
+  "duplicates_injected": 0,
+  "late_events_dropped_by_query": {
+    "sessions_online": 0,
+    "events_raw": 0
+  },
+  "late": {
+    "injected_by_delay_steps": {},
+    "injected_without_on_time_duplicate": 0
+  },
+  "definition_gap_users_vs_sessions": {
+    "batch_sessions_sum": 1457071,
+    "batch_users_sum": 1402365,
+    "users_lower_by": 54706,
+    "stream_users_equal_batch_users_windows": 1008
+  }
+}

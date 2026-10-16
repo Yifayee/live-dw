@@ -1,0 +1,26 @@
+{
+  "run_id": "smoke_d10_16",
+  "dry_run": false,
+  "days": [
+    10,
+    16
+  ],
+  "steps": [
+    1440,
+    2448
+  ],
+  "heartbeats_source": 1457071,
+  "events_sent": 1457071,
+  "on_time": 1457071,
+  "late": 0,
+  "duplicates": 0,
+  "late_rate": 0.0,
+  "max_delay_steps": 6,
+  "dup_rate": 0.0,
+  "seed": 42,
+  "step_seconds": 0.0,
+  "load_seconds": 0.95,
+  "send_seconds": 5.21,
+  "events_per_second": 279612,
+  "truth_file": "data/stream/injections_smoke_d10_16.csv"
+}

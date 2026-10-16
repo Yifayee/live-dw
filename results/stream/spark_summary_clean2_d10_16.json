@@ -1,0 +1,39 @@
+{
+  "run_id": "clean2_d10_16",
+  "source": "kafka",
+  "topic": "twitch_hb_clean2",
+  "watermark_min": 20,
+  "trigger_sec": 1,
+  "cores": 4,
+  "spark_version": "4.2.0",
+  "wall_seconds_incl_idle": 1079.6,
+  "queries": {
+    "events_raw": {
+      "input_rows": 1457072,
+      "batches_with_data": 1007,
+      "batch_ms_p50": 995,
+      "batch_ms_p95": 1113.2,
+      "batch_ms_max": 1922,
+      "processed_rows_per_sec_median": 1285,
+      "state_rows_dropped_by_watermark": 0
+    },
+    "sessions_online": {
+      "input_rows": 1457072,
+      "batches_with_data": 997,
+      "batch_ms_p50": 991,
+      "batch_ms_p95": 1197.0,
+      "batch_ms_max": 2327,
+      "processed_rows_per_sec_median": 1311,
+      "state_rows_dropped_by_watermark": 0
+    },
+    "users_online": {
+      "input_rows": 1457072,
+      "batches_with_data": 1003,
+      "batch_ms_p50": 986,
+      "batch_ms_p95": 1185.6,
+      "batch_ms_max": 2024,
+      "processed_rows_per_sec_median": 1322,
+      "state_rows_dropped_by_watermark": 0
+    }
+  }
+}

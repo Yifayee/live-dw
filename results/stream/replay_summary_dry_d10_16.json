@@ -1,0 +1,26 @@
+{
+  "run_id": "dry_d10_16",
+  "dry_run": true,
+  "days": [
+    10,
+    16
+  ],
+  "steps": [
+    1440,
+    2448
+  ],
+  "heartbeats_source": 1457071,
+  "events_sent": 1457071,
+  "on_time": 1457071,
+  "late": 0,
+  "duplicates": 0,
+  "late_rate": 0.0,
+  "max_delay_steps": 6,
+  "dup_rate": 0.0,
+  "seed": 42,
+  "step_seconds": 0.0,
+  "load_seconds": 1.28,
+  "send_seconds": 0.62,
+  "events_per_second": 2365640,
+  "truth_file": "data/stream/injections_dry_d10_16.csv"
+}

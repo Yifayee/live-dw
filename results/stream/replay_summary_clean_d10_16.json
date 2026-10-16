@@ -1,0 +1,27 @@
+{
+  "run_id": "clean_d10_16",
+  "dry_run": false,
+  "days": [
+    10,
+    16
+  ],
+  "steps": [
+    1440,
+    2448
+  ],
+  "heartbeats_source": 1457071,
+  "events_sent": 1457071,
+  "on_time": 1457071,
+  "late": 0,
+  "duplicates": 0,
+  "flush_markers": 1,
+  "late_rate": 0.0,
+  "max_delay_steps": 6,
+  "dup_rate": 0.0,
+  "seed": 42,
+  "step_seconds": 1.0,
+  "load_seconds": 0.63,
+  "send_seconds": 1021.82,
+  "events_per_second": 1426,
+  "truth_file": "data/stream/injections_clean_d10_16.csv"
+}
