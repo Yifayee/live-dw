@@ -1,0 +1,18 @@
+{
+  "faulty2_d10_16": {
+    "metric": "events_raw",
+    "windows": 1007,
+    "lag_sec_p50": 6.9,
+    "lag_sec_p95": 8.9,
+    "lag_sec_max": 16.1,
+    "step_seconds": 1.0
+  },
+  "wm70_d10_16": {
+    "metric": "events_raw",
+    "windows": 1007,
+    "lag_sec_p50": 11.3,
+    "lag_sec_p95": 13.0,
+    "lag_sec_max": 20.1,
+    "step_seconds": 1.0
+  }
+}

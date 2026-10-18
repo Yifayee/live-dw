@@ -1,0 +1,39 @@
+{
+  "run_id": "wm70_d10_16",
+  "source": "kafka",
+  "topic": "twitch_hb_wm70",
+  "watermark_min": 70,
+  "trigger_sec": 1,
+  "cores": 4,
+  "spark_version": "4.2.0",
+  "wall_seconds_incl_idle": 1147.8,
+  "queries": {
+    "events_raw": {
+      "input_rows": 1464390,
+      "batches_with_data": 1015,
+      "batch_ms_p50": 996,
+      "batch_ms_p95": 1068.4,
+      "batch_ms_max": 1239,
+      "processed_rows_per_sec_median": 1339,
+      "state_rows_dropped_by_watermark": 0
+    },
+    "sessions_online": {
+      "input_rows": 1464390,
+      "batches_with_data": 1014,
+      "batch_ms_p50": 992.0,
+      "batch_ms_p95": 1114.0,
+      "batch_ms_max": 1832,
+      "processed_rows_per_sec_median": 1313,
+      "state_rows_dropped_by_watermark": 0
+    },
+    "users_online": {
+      "input_rows": 1464390,
+      "batches_with_data": 1013,
+      "batch_ms_p50": 989,
+      "batch_ms_p95": 1114.9,
+      "batch_ms_max": 1871,
+      "processed_rows_per_sec_median": 1307,
+      "state_rows_dropped_by_watermark": 0
+    }
+  }
+}

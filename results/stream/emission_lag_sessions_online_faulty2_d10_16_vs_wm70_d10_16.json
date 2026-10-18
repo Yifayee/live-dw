@@ -1,0 +1,18 @@
+{
+  "faulty2_d10_16": {
+    "metric": "sessions_online",
+    "windows": 1007,
+    "lag_sec_p50": 7.1,
+    "lag_sec_p95": 9.3,
+    "lag_sec_max": 16.2,
+    "step_seconds": 1.0
+  },
+  "wm70_d10_16": {
+    "metric": "sessions_online",
+    "windows": 1007,
+    "lag_sec_p50": 11.5,
+    "lag_sec_p95": 13.1,
+    "lag_sec_max": 20.5,
+    "step_seconds": 1.0
+  }
+}
