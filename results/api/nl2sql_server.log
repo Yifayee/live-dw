@@ -1,0 +1,29 @@
+INFO:     Started server process [66197]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:60890 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60892 - "POST /nl2sql HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60894 - "POST /nl2sql HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60896 - "POST /nl2sql HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60897 - "POST /nl2sql HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60898 - "POST /nl2sql HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60899 - "POST /nl2sql HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60900 - "POST /nl2sql HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60901 - "POST /nl2sql HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60902 - "POST /nl2sql HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60903 - "POST /nl2sql HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60904 - "POST /nl2sql HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60905 - "POST /nl2sql HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60907 - "POST /nl2sql HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60915 - "POST /nl2sql HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60917 - "POST /nl2sql HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60918 - "POST /nl2sql HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60919 - "POST /nl2sql HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60920 - "POST /nl2sql HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60921 - "POST /nl2sql HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60922 - "POST /nl2sql HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [66197]

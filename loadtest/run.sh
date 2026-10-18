@@ -11,7 +11,7 @@ mkdir -p results/api
 for i in $(seq 1 30); do curl -s localhost:8000/health >/dev/null || break; sleep 1; done
 if curl -s localhost:8000/health >/dev/null; then echo "port 8000 still in use, aborting"; exit 1; fi
 
-DB_MODE=$MODE CACHE=$CACHE_FLAG uvicorn api.app:app --port 8000 --log-level warning \
+DB_MODE=$MODE CACHE=$CACHE_FLAG python -m uvicorn api.app:app --port 8000 --log-level warning \
   > "results/api/${LABEL}_server.log" 2>&1 &
 API_PID=$!
 trap 'kill $API_PID 2>/dev/null || true; wait $API_PID 2>/dev/null || true' EXIT
@@ -25,7 +25,7 @@ case "$HEALTH" in
   *) echo "API settings do not match this round, aborting"; exit 1 ;;
 esac
 
-locust -f "${LOCUSTFILE:-loadtest/locustfile.py}" --host http://127.0.0.1:8000 --headless \
+python -m locust -f "${LOCUSTFILE:-loadtest/locustfile.py}" --host http://127.0.0.1:8000 --headless \
   -u "$USERS" -r 10 -t "${SECS}s" --csv "results/api/${LABEL}" --only-summary > "results/api/${LABEL}_locust.log" 2>&1 || true
 # If the load generator itself saturates a CPU core, QPS is capped by Locust, not the API.
 grep -i "cpu usage" "results/api/${LABEL}_locust.log" | head -1 || true

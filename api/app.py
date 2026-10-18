@@ -16,7 +16,7 @@ before and after an optimization:
   CACHE=1               cache metric query results in memory (LRU), keyed by SQL + params
 
 Run from the live-dw root:
-  DB_MODE=per_request uvicorn api.app:app --port 8000
+  DB_MODE=per_request python -m uvicorn api.app:app --port 8000
 """
 import os
 import sys
