@@ -54,6 +54,7 @@
   },
   "late_drop_bound": {
     "sessions_online": {
+      "events_dropped": 6981,
       "min_delay_consistent_with_all_windows": 4,
       "by_k": {
         "1": {
@@ -83,6 +84,7 @@
       }
     },
     "events_raw": {
+      "events_dropped": 4731,
       "min_delay_consistent_with_all_windows": 3,
       "by_k": {
         "1": {

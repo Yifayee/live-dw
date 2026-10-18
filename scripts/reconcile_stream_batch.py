@@ -197,7 +197,11 @@ def main():
                              "windows_shortfall_exceeds_them": bad}
         ok = [k for k in range(1, max_delay + 1)
               if per_k[str(k)]["windows_shortfall_exceeds_them"] == 0]
-        drop_bound[metric] = {"min_delay_consistent_with_all_windows": max(ok) if ok else None,
+        dropped = q(f"select coalesce(sum({short}), 0) from windows w where w.{metric} is not null")[0][0]
+        # With nothing dropped every k trivially holds, so the bound is not meaningful.
+        drop_bound[metric] = {"events_dropped": dropped,
+                              "min_delay_consistent_with_all_windows":
+                                  (max(ok) if ok else None) if dropped else None,
                               "by_k": per_k}
 
     summary = {
