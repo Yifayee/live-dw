@@ -38,6 +38,66 @@
     "injected_by_delay_steps": {},
     "injected_without_on_time_duplicate": 0
   },
+  "late_drop_bound": {
+    "sessions_online": {
+      "min_delay_consistent_with_all_windows": 6,
+      "by_k": {
+        "1": {
+          "late_events_with_delay_ge_k": 0,
+          "windows_shortfall_exceeds_them": 0
+        },
+        "2": {
+          "late_events_with_delay_ge_k": 0,
+          "windows_shortfall_exceeds_them": 0
+        },
+        "3": {
+          "late_events_with_delay_ge_k": 0,
+          "windows_shortfall_exceeds_them": 0
+        },
+        "4": {
+          "late_events_with_delay_ge_k": 0,
+          "windows_shortfall_exceeds_them": 0
+        },
+        "5": {
+          "late_events_with_delay_ge_k": 0,
+          "windows_shortfall_exceeds_them": 0
+        },
+        "6": {
+          "late_events_with_delay_ge_k": 0,
+          "windows_shortfall_exceeds_them": 0
+        }
+      }
+    },
+    "events_raw": {
+      "min_delay_consistent_with_all_windows": 6,
+      "by_k": {
+        "1": {
+          "late_events_with_delay_ge_k": 0,
+          "windows_shortfall_exceeds_them": 0
+        },
+        "2": {
+          "late_events_with_delay_ge_k": 0,
+          "windows_shortfall_exceeds_them": 0
+        },
+        "3": {
+          "late_events_with_delay_ge_k": 0,
+          "windows_shortfall_exceeds_them": 0
+        },
+        "4": {
+          "late_events_with_delay_ge_k": 0,
+          "windows_shortfall_exceeds_them": 0
+        },
+        "5": {
+          "late_events_with_delay_ge_k": 0,
+          "windows_shortfall_exceeds_them": 0
+        },
+        "6": {
+          "late_events_with_delay_ge_k": 0,
+          "windows_shortfall_exceeds_them": 0
+        }
+      }
+    }
+  },
   "definition_gap_users_vs_sessions": {
     "batch_sessions_sum": 1457071,
     "batch_users_sum": 1402365,

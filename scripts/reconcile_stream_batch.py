@@ -24,9 +24,12 @@ Also reported: late events dropped per query, and the users vs sessions definiti
 
 Run from the live-dw root, for example:
   python scripts/reconcile_stream_batch.py --run-id clean2_d10_16
-  python scripts/reconcile_stream_batch.py --run-id faulty_d10_16 --min-match-rate 0.95
+  python scripts/reconcile_stream_batch.py --run-id faulty2_d10_16 --min-match-rate 0 --max-unexplained 0
 
-Exit code 1 if the window match rate is below --min-match-rate, so the check can gate a pipeline.
+Exit code 1 (so the check can gate a pipeline) if
+  - the window match rate is below --min-match-rate (clean runs: expect 1.0), or
+  - more than --max-unexplained windows fall outside {match, late_beyond_watermark}
+    (fault-injection runs: every difference must be attributed to an injected cause).
 """
 import argparse
 import json
@@ -41,6 +44,8 @@ def parse_args():
     p.add_argument("--run-id", required=True)
     p.add_argument("--db", default="warehouse.duckdb")
     p.add_argument("--min-match-rate", type=float, default=1.0)
+    p.add_argument("--max-unexplained", type=int, default=None,
+                   help="max windows not in {match, late_beyond_watermark}; unset = no check")
     return p.parse_args()
 
 
@@ -163,6 +168,38 @@ def main():
     late_by_delay = q("""
         select delay_steps, count(*) from inj where kind = 'late' group by 1 order by 1""")
 
+    # Which late events were dropped? Per window, the shortfall must be covered by late
+    # events (without an on-time duplicate) delayed by at least k steps. The largest k that
+    # holds in every window bounds how late an event had to be before the query dropped it.
+    max_delay = replay["max_delay_steps"]
+    con.execute("""
+        create table late_nd as
+        select step, delay_steps from inj
+        where kind = 'late'
+          and event_id not in (select event_id from inj where kind = 'duplicate')
+    """)
+    shortfall_sql = {
+        "sessions_online": "w.batch_sessions - w.sessions_online",
+        "events_raw": "w.batch_sessions + w.dup_events - w.events_raw",
+    }
+    drop_bound = {}
+    for metric, short in shortfall_sql.items():
+        per_k = {}
+        for k in range(1, max_delay + 1):
+            bad, cand = q(f"""
+                select count(*) filter (where ({short}) > coalesce(x.c, 0)),
+                       coalesce(sum(x.c), 0)
+                from windows w
+                left join (select step, count(*) as c from late_nd
+                           where delay_steps >= {k} group by step) x using (step)
+                where w.{metric} is not null""")[0]
+            per_k[str(k)] = {"late_events_with_delay_ge_k": cand,
+                             "windows_shortfall_exceeds_them": bad}
+        ok = [k for k in range(1, max_delay + 1)
+              if per_k[str(k)]["windows_shortfall_exceeds_them"] == 0]
+        drop_bound[metric] = {"min_delay_consistent_with_all_windows": max(ok) if ok else None,
+                              "by_k": per_k}
+
     summary = {
         "run_id": args.run_id,
         "steps": [lo, hi],
@@ -193,6 +230,7 @@ def main():
             "injected_without_on_time_duplicate":
                 q("select coalesce(sum(late_no_dup), 0) from windows")[0][0],
         },
+        "late_drop_bound": drop_bound,
         "definition_gap_users_vs_sessions": {
             "batch_sessions_sum": bs_sum,
             "batch_users_sum": bu_sum,
@@ -208,8 +246,17 @@ def main():
         json.dump(summary, f, indent=2, default=str)
     print(json.dumps(summary, indent=2, default=str))
 
+    failed = False
     if n and matched / n < args.min_match_rate:
         print(f"FAIL: window match rate {matched / n:.4%} < {args.min_match_rate:.2%}")
+        failed = True
+    unattributed = sum(v["windows"] for c, v in categories.items()
+                       if c not in ("match", "late_beyond_watermark"))
+    if args.max_unexplained is not None and unattributed > args.max_unexplained:
+        print(f"FAIL: {unattributed} windows not attributed to an injected cause "
+              f"(max {args.max_unexplained})")
+        failed = True
+    if failed:
         sys.exit(1)
     print("PASS")
 
