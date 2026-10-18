@@ -1,0 +1,4 @@
+Apple M4
+cores: 10
+memory: 24 GB
+macOS 15.7.9

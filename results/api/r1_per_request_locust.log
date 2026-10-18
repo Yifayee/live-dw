@@ -1,0 +1,25 @@
+[2026-10-18 03:18:44,415] Fayes-MacBook-Air-4/INFO/locust.main: Starting Locust 2.46.7
+[2026-10-18 03:18:44,421] Fayes-MacBook-Air-4/INFO/locust.main: Run time limit set to 60 seconds
+[2026-10-18 03:18:44,421] Fayes-MacBook-Air-4/INFO/locust.runners: Ramping to 50 users at a rate of 10.00 per second
+[2026-10-18 03:18:48,423] Fayes-MacBook-Air-4/INFO/locust.runners: All users spawned: {"MetricsUser": 50} (50 total users)
+[2026-10-18 03:19:43,593] Fayes-MacBook-Air-4/INFO/locust.main: --run-time limit reached, shutting down
+[2026-10-18 03:19:43,621] Fayes-MacBook-Air-4/INFO/locust.main: Shutting down (exit code 0)
+Type     Name                                                                          # reqs      # fails |    Avg     Min     Max    Med |   req/s  failures/s
+--------|----------------------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
+GET      /metrics/ads/campaign                                                          15070     0(0.00%) |     12       1     519     11 |  254.57        0.00
+GET      /metrics/ads/daily                                                             14849     0(0.00%) |     12       1     522     10 |  250.84        0.00
+GET      /metrics/live/concurrency                                                      29787     0(0.00%) |     13       1     521     11 |  503.18        0.00
+GET      /metrics/live/daily                                                            14945     0(0.00%) |     12       1     519     10 |  252.46        0.00
+--------|----------------------------------------------------------------------------|-------|-------------|-------|-------|-------|-------|--------|-----------
+         Aggregated                                                                     74651     0(0.00%) |     12       1     522     11 | 1261.04        0.00
+
+Response time percentiles (approximated)
+Type     Name                                                                                  50%    66%    75%    80%    90%    95%    98%    99%  99.9% 99.99%   100% # reqs
+--------|--------------------------------------------------------------------------------|--------|------|------|------|------|------|------|------|------|------|------|------
+GET      /metrics/ads/campaign                                                                  11     13     15     16     20     26     41     54    150    520    520  15070
+GET      /metrics/ads/daily                                                                     10     13     14     16     20     26     41     58    170    520    520  14849
+GET      /metrics/live/concurrency                                                              11     13     15     17     21     27     42     55    150    220    520  29787
+GET      /metrics/live/daily                                                                    10     13     14     16     20     26     40     53    150    520    520  14945
+--------|--------------------------------------------------------------------------------|--------|------|------|------|------|------|------|------|------|------|------|------
+         Aggregated                                                                             11     13     15     16     20     26     41     55    150    520    520  74651
+
