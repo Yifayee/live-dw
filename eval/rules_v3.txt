@@ -1,0 +1,6 @@
+- Return ONE SQL statement only. For "both A and B" questions, put the logic in a single
+  query (a join, INTERSECT inside a subquery, or a filtered count), never two statements.
+- The is_full_day filter is for comparing or ranking days. Totals and overall rates over
+  "the whole period" or "the whole dataset" include all days unless the question says full days.
+- Overall rates (CTR, CVR, CPA, CPM) are ratios of sums, e.g. SUM(clicks) / SUM(impressions),
+  never the average of daily or per-campaign ratios.

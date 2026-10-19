@@ -1,0 +1,6 @@
+timestamp,label,model,question_set,questions,runs,retry,expose_ads,rules_file,prompt_sha,git_sha,acc_mean,acc_min,acc_max,acc_strict_mean,stable_correct,error_categories
+2026-10-18T14:04:21,r1_baseline,claude-haiku-4-5-20251001,eval/test_v2.json,24,3,True,False,,b00999fa1e80,327b55b,0.4722,0.4583,0.5,0.3889,11,"{""no_sql_returned"": 36, ""multi_statement"": 1, ""row_count"": 1}"
+2026-10-18T14:05:53,r2_ads_exposed,claude-haiku-4-5-20251001,eval/test_v2.json,24,3,True,True,,cc1488ffdc35,327b55b,0.9167,0.9167,0.9167,0.6667,22,"{""multi_statement"": 3, ""extra_flag_filter"": 3}"
+2026-10-18T15:58:46,r3_rules,claude-haiku-4-5-20251001,eval/test_v2.json,24,3,True,True,eval/rules_v3.txt,eaca9e78079f,327b55b,0.9167,0.875,0.9583,0.6667,20,"{""multi_statement"": 2, ""row_count"": 2, ""wrong_table"": 2}"
+2026-10-18T15:59:46,r3_regress_gold,claude-haiku-4-5-20251001,eval/gold.json,20,3,True,True,eval/rules_v3.txt,eaca9e78079f,327b55b,1.0,1.0,1.0,0.7333,20,{}
+2026-10-18T16:00:10,r3_regress_holdout,claude-haiku-4-5-20251001,eval/holdout.json,8,3,True,True,eval/rules_v3.txt,eaca9e78079f,327b55b,1.0,1.0,1.0,0.875,8,{}

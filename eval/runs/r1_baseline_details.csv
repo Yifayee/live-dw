@@ -1,0 +1,702 @@
+run,id,module,question,status,strict,retried,category,pred_sql,gold_sql,error
+1,t01,live,"On full days, what was the average peak concurrent users (PCU)?",correct,True,False,,"WITH full_days AS (
+  SELECT pcu
+  FROM ads_platform_daily
+  WHERE is_full_day = true
+)
+SELECT AVG(pcu) as avg_pcu
+FROM full_days;",SELECT AVG(pcu) FROM ads_platform_daily WHERE is_full_day,
+1,t02,live,Which 3 full days had the most viewing sessions?,correct,False,False,,"WITH full_days AS (
+  SELECT day_index, sessions
+  FROM ads_platform_daily
+  WHERE is_full_day = true
+  ORDER BY sessions DESC
+  LIMIT 3
+)
+SELECT day_index, sessions
+FROM full_days
+ORDER BY sessions DESC;",SELECT day_index FROM ads_platform_daily WHERE is_full_day ORDER BY sessions DESC LIMIT 3,
+1,t03,live,What share of users were active on only one day?,correct,True,False,,"WITH user_day_counts AS (
+  SELECT user_id, COUNT(DISTINCT day_index) AS days_active
+  FROM dws_user_day
+  GROUP BY user_id
+)
+SELECT CAST(SUM(CASE WHEN days_active = 1 THEN 1 ELSE 0 END) AS DOUBLE) / COUNT(*) AS share_active_one_day_only
+FROM user_day_counts;",SELECT COUNT(*) FILTER (WHERE active_days = 1) / COUNT(*) FROM dim_user,
+1,t04,live,"How many streamers had at least 1,000 unique viewers?",correct,True,False,,"WITH streamer_stats AS (
+  SELECT streamer, n_unique_viewers
+  FROM dim_streamer
+)
+SELECT COUNT(*) AS streamers_with_1000_plus_viewers
+FROM streamer_stats
+WHERE n_unique_viewers >= 1000;",SELECT COUNT(*) FROM dim_streamer WHERE n_unique_viewers >= 1000,
+1,t05,live,By how much did DAU change from day 20 to day 21?,correct,True,False,,"WITH day_data AS (
+  SELECT day_index, dau
+  FROM ads_platform_daily
+  WHERE day_index IN (20, 21) AND is_full_day = true
+)
+SELECT
+  (SELECT dau FROM day_data WHERE day_index = 21) -
+  (SELECT dau FROM day_data WHERE day_index = 20) AS dau_change",SELECT MAX(dau) FILTER (WHERE day_index = 21) - MAX(dau) FILTER (WHERE day_index = 20) FROM ads_platform_daily,
+1,t06,live,What was the average number of concurrent users across the 10-minute steps of day 15?,correct,True,False,,"WITH day_15_steps AS (
+  SELECT concurrent_users
+  FROM ads_platform_concurrency
+  WHERE day_index = 15
+)
+SELECT AVG(concurrent_users)::DOUBLE AS avg_concurrent_users
+FROM day_15_steps;",SELECT AVG(concurrent_users) FROM ads_platform_concurrency WHERE day_index = 15,
+1,t07,live,How many users watched more than 10 hours in total on day 5?,correct,True,False,,"WITH user_watch_day5 AS (
+  SELECT user_id, watch_min
+  FROM dws_user_day
+  WHERE day_index = 5
+)
+SELECT COUNT(*) AS num_users
+FROM user_watch_day5
+WHERE watch_min > 600;",SELECT COUNT(*) FROM dws_user_day WHERE day_index = 5 AND watch_min > 600,
+1,t08,live,Which streamer gained the most viewers from day 10 to day 11?,correct,False,False,,"WITH streamer_day_10 AS (
+  SELECT streamer, n_viewers AS viewers_day_10
+  FROM dws_streamer_day
+  WHERE day_index = 10
+),
+streamer_day_11 AS (
+  SELECT streamer, n_viewers AS viewers_day_11
+  FROM dws_streamer_day
+  WHERE day_index = 11
+),
+viewer_change AS (
+  SELECT
+    COALESCE(d10.streamer, d11.streamer) AS streamer,
+    COALESCE(d10.viewers_day_10, 0) AS viewers_day_10,
+    COALESCE(d11.viewers_day_11, 0) AS viewers_day_11,
+    COALESCE(d11.viewers_day_11, 0) - COALESCE(d10.viewers_day_10, 0) AS viewer_gain
+  FROM streamer_day_10 d10
+  FULL OUTER JOIN streamer_day_11 d11 ON d10.streamer = d11.streamer
+)
+SELECT streamer, viewer_gain
+FROM viewer_change
+ORDER BY viewer_gain DESC
+LIMIT 1;",SELECT b.streamer FROM dws_streamer_day a JOIN dws_streamer_day b ON a.streamer = b.streamer AND a.day_index = 10 AND b.day_index = 11 ORDER BY b.n_viewers - a.n_viewers DESC LIMIT 1,
+1,t09,live,What is the average session length in minutes in ninja's channel?,correct,True,False,,"WITH ninja_sessions AS (
+  SELECT duration_min
+  FROM dwd_watch_session
+  WHERE streamer = 'ninja'
+)
+SELECT AVG(duration_min) AS avg_session_length_min
+FROM ninja_sessions;",SELECT AVG(duration_min) FROM dwd_watch_session WHERE streamer = 'ninja',
+1,t10,live,How many users were active on both day 0 and day 42?,rejected,False,False,multi_statement,"WITH day0_users AS (
+  SELECT DISTINCT user_id
+  FROM dws_user_day
+  WHERE day_index = 0
+),
+day42_users AS (
+  SELECT DISTINCT user_id
+  FROM dws_user_day
+  WHERE day_index = 42
+)
+SELECT COUNT(*) AS users_active_both_days
+FROM day0_users
+INTERSECT
+SELECT COUNT(*)
+FROM day42_users
+WHERE user_id IN (SELECT user_id FROM day0_users);
+
+SELECT COUNT(DISTINCT u0.user_id) AS users_active_both_days
+FROM dws_user_day u0
+INNER JOIN dws_user_day u42 ON u0.user_id = u42.user_id
+WHERE u0.day_index = 0 AND u42.day_index = 42;",SELECT COUNT(*) FROM (SELECT user_id FROM dws_user_day WHERE day_index = 0 INTERSECT SELECT user_id FROM dws_user_day WHERE day_index = 42),
+1,t11,live,What is the 7-day retention of the largest cohort?,correct,True,False,,"WITH cohort_stats AS (
+  SELECT cohort_day, cohort_size, retention_d7
+  FROM ads_user_retention
+  WHERE cohort_day > 0
+  ORDER BY cohort_size DESC
+  LIMIT 1
+)
+SELECT retention_d7
+FROM cohort_stats;",SELECT retention_d7 FROM ads_user_retention ORDER BY cohort_size DESC LIMIT 1,
+1,t12,live,What fraction of all watch minutes came from the top 10 streamers by watch minutes?,correct,True,False,,"WITH streamer_watch_min AS (
+  SELECT 
+    streamer,
+    total_watch_min
+  FROM dim_streamer
+  ORDER BY total_watch_min DESC
+  LIMIT 10
+),
+top_10_total AS (
+  SELECT SUM(total_watch_min) AS top_10_watch_min
+  FROM streamer_watch_min
+),
+platform_total AS (
+  SELECT SUM(total_watch_min) AS platform_watch_min
+  FROM dim_streamer
+)
+SELECT 
+  top_10_total.top_10_watch_min / CAST(platform_total.platform_watch_min AS DOUBLE) AS fraction_from_top_10
+FROM top_10_total, platform_total;",SELECT (SELECT SUM(total_watch_min) FROM (SELECT total_watch_min FROM dim_streamer ORDER BY total_watch_min DESC LIMIT 10)) / SUM(total_watch_min) FROM dim_streamer,
+1,a01,ads,Which full day had the highest ad click-through rate?,rejected,False,False,no_sql_returned,"I need to find which full day had the highest ad click-through rate. However, looking at the available schema, I don't see any table containing ad click-through rate data or ad clicks information.
+
+The tables available are:
+- dwd_watch_session (viewing records)
+- dim_user, dim_streamer, dim_data_window (dimension tables)
+- dws_user_day, dws_streamer_day (daily summaries)
+- ads_platform_concurrency, ads_platform_daily (platform metrics)
+- ads_user_retention (retention metrics)
+
+None of these tables contain ad-related metrics like impressions, clicks, or click-through rates. The ""ads_"" prefix in some table names refers to ""advertising/analytics"" datasets about user behavior, not advertising performance metrics.
+
+Since the required data to answer this question is not available in the schema:
+
+SELECT NULL as day_index, NULL as ad_click_through_rate WHERE FALSE",SELECT day_index FROM ads_ad_daily WHERE is_full_day ORDER BY ctr DESC LIMIT 1,
+1,a02,ads,What was the overall CTR across the whole ad dataset?,rejected,False,False,no_sql_returned,"I don't have sufficient information to answer this question. The schema provided does not contain any tables with ad impressions, ad clicks, or click-through rate data. 
+
+The available tables track:
+- Watch sessions (viewing behavior)
+- User activity metrics
+- Streamer statistics
+- Platform concurrency and daily metrics
+- User retention
+
+To calculate CTR (Click-Through Rate), I would need tables containing:
+- Ad impressions (how many times ads were shown)
+- Ad clicks (how many times users clicked on ads)
+
+Could you clarify which table contains ad impression and click data, or provide the schema for the ads/advertising tables?",SELECT SUM(clicks) / SUM(impressions) FROM ads_ad_daily,
+1,a03,ads,Which campaign has the lowest CPA among campaigns that can be ranked?,rejected,False,False,no_sql_returned,"I don't see any campaign or advertising data in the provided schema. The tables contain streaming viewership data (watch sessions, streamer information, user retention, platform concurrency) but no campaign information or cost-per-acquisition (CPA) metrics.
+
+To answer a question about campaign CPA, I would need tables that include:
+- Campaign identifiers
+- Campaign costs or spending data
+- Conversion or acquisition data attributed to campaigns
+
+Could you clarify which table contains the campaign data, or provide the schema for campaign-related tables?",SELECT campaign_id FROM ads_ad_campaign_performance WHERE cpa_rank = 1,
+1,a04,ads,How many campaigns have enough conversions to receive a CPA rank?,rejected,False,False,no_sql_returned,"I don't see any campaigns, conversions, or CPA rank tables in the provided schema. The available tables are focused on live-streaming data warehouse metrics (watch sessions, users, streamers, platform concurrency, and retention).
+
+Could you clarify:
+1. Do you have a campaigns or conversions table that wasn't included in the schema?
+2. Or are you asking about a different metric from the live-streaming data (like viewers, sessions, or watch time)?
+
+Without the relevant tables, I cannot write a valid query to answer your question.",SELECT COUNT(*) FROM ads_ad_campaign_performance WHERE is_rankable,
+1,a05,ads,What was the overall conversion rate (conversions per click) on mature days?,rejected,False,False,no_sql_returned,"I need to clarify what ""conversions"" and ""clicks"" mean in this streaming context, as the schema doesn't contain explicit conversion or click data. 
+
+Based on the available data, I cannot compute a traditional ""conversion rate (conversions per click)"" because:
+- There is no `clicks` column in any table
+- There is no `conversions` column in any table
+- The schema contains viewing/streaming data, not ad click or conversion tracking data
+
+If you're asking about a streaming platform metric like:
+- **Engagement rate**: session initiation or watch time per user
+- **Retention conversion**: users returning (D1/D7 retention)
+- **Streamer activation**: users watching multiple streamers
+
+Please clarify what you mean by ""conversions"" and ""clicks"" in your context, and I can provide the appropriate query.",SELECT SUM(conversions) / SUM(clicks) FROM ads_ad_daily WHERE is_mature_day,
+1,a06,ads,Which campaign accounts for the largest share of total cost?,rejected,False,False,no_sql_returned,"I don't see any campaign or cost data in the provided schema. The tables contain information about viewing sessions, streamers, users, and platform metrics, but there are no tables or columns related to campaigns or costs.
+
+Could you clarify what you mean by ""campaign"" in this context? For example:
+- Are you referring to specific streamers as campaigns?
+- Is there a different dataset or table I should be querying?
+- Should I be analyzing a specific metric like watch time or viewer counts by streamer?
+
+Please provide more details so I can write an accurate query.",SELECT campaign_id FROM ads_ad_campaign_performance ORDER BY share_of_cost DESC LIMIT 1,
+1,a07,ads,How many ad impressions were served on day 10?,rejected,False,False,no_sql_returned,"I don't have access to an `ads_impressions` table or any table that tracks ad impressions served. The available schema includes tables for watch sessions, user activity, streamer data, platform concurrency, and retention metrics, but none contain ad impression counts.
+
+To answer this question, I would need either:
+- An `ads_impressions` table with impression counts by day
+- A table tracking ad serving events
+- Or clarification on how ad impressions should be calculated from the available data
+
+If you'd like me to answer a different question using the available tables (such as platform metrics, watch time, or user activity for day 10), please let me know.",SELECT impressions FROM ads_ad_daily WHERE day_index = 10,
+1,a08,ads,How many ad clicks were there in total over days 0 to 6?,rejected,False,False,no_sql_returned,"I don't have access to an ads clicks table in the provided schema. The available tables contain information about watch sessions, user activity, streamer metrics, concurrency, and retention, but there is no table tracking ad clicks or ad impressions.
+
+To answer this question, I would need a table that records ad click events. Could you clarify:
+1. Is there an ads clicks table available?
+2. Should I be inferring ad metrics from watch time or sessions?
+3. Is this data in a different table not listed in the schema?",SELECT SUM(clicks) FROM ads_ad_daily WHERE day_index BETWEEN 0 AND 6,
+1,a09,ads,What is the median CPA among rankable campaigns?,rejected,False,False,no_sql_returned,"I don't see any table in the schema that contains campaign data, CPA (cost per acquisition), or advertising campaign information. The schema provided focuses on:
+
+- Watch sessions and viewer behavior (dwd_watch_session, dim_user, dws_user_day)
+- Streamer activity (dim_streamer, dws_streamer_day)
+- Platform-wide metrics (ads_platform_concurrency, ads_platform_daily)
+- User retention (ads_user_retention)
+
+There is no campaigns table or CPA metric available in this live-streaming data warehouse schema.
+
+Could you clarify if you meant to ask a different question about the available data, or confirm that campaign/CPA tables should exist in the schema?",SELECT MEDIAN(cpa) FROM ads_ad_campaign_performance WHERE is_rankable,
+1,a10,ads,Which campaign had the most clicks on day 3?,rejected,False,False,no_sql_returned,"I don't have access to a campaigns table or click data in the provided schema. The available tables contain streaming platform data (watch sessions, streamers, users, and concurrent user metrics), but no campaign or advertising click information.
+
+To answer your question, I would need tables like:
+- A campaigns table with campaign identifiers
+- An events or clicks table with campaign_id and click counts
+- Or an ads_campaign_performance table with daily metrics
+
+Could you clarify if you meant a different question about the streaming data, such as which streamer had the most viewers on day 3, or if you have additional tables available?",SELECT campaign_id FROM dws_ad_campaign_day WHERE day_index = 3 ORDER BY clicks DESC LIMIT 1,
+1,a11,ads,How many campaigns had impressions on every full day?,rejected,False,False,no_sql_returned,"I need to find campaigns that had impressions on every full day. However, looking at the provided schema, I don't see any tables related to campaigns or impressions. The available tables focus on watch sessions, users, streamers, and platform metrics, but there's no `campaigns`, `ads_campaigns`, or similar table that would contain impression data.
+
+Based on the schema provided, I cannot answer this question because there is no data about campaigns or impressions in the available tables.
+
+If you meant to ask a different question about the streaming data (such as streamers active on every full day, or users with activity across all full days), please clarify and I can help with that.",SELECT COUNT(*) FROM (SELECT campaign_id FROM dws_ad_campaign_day WHERE is_full_day GROUP BY campaign_id HAVING COUNT(DISTINCT day_index) = (SELECT last_full_day + 1 FROM dim_ad_data_window)),
+1,a12,ads,"On average, how many campaigns were active per full day?",rejected,False,False,no_sql_returned,"I need to find information about campaigns in the schema, but I don't see a campaigns table or campaign-related columns in any of the provided tables.
+
+Looking at the available tables, I have metrics about:
+- Watch sessions (dwd_watch_session)
+- Users (dim_user)
+- Streamers (dim_streamer)
+- Daily platform metrics (ads_platform_daily)
+- User retention (ads_user_retention)
+
+But there is no table or column that tracks ""campaigns"" explicitly. The schema appears to focus on streaming activity, viewers, streamers, and watch time metrics - not advertising or marketing campaigns.
+
+Since I cannot find campaign data in the provided schema, I cannot write a valid query to answer this question. Could you clarify what you mean by ""campaigns""? Are you referring to:
+- Active streamers per day?
+- Something else from a table not included in this schema?",SELECT AVG(active_campaigns) FROM ads_ad_daily WHERE is_full_day,
+2,t01,live,"On full days, what was the average peak concurrent users (PCU)?",correct,True,False,,"SELECT AVG(pcu) as average_pcu
+FROM ads_platform_daily
+WHERE is_full_day = true;",SELECT AVG(pcu) FROM ads_platform_daily WHERE is_full_day,
+2,t02,live,Which 3 full days had the most viewing sessions?,correct,False,False,,"WITH full_days AS (
+  SELECT day_index, sessions
+  FROM ads_platform_daily
+  WHERE is_full_day = true
+  ORDER BY sessions DESC
+  LIMIT 3
+)
+SELECT day_index, sessions
+FROM full_days
+ORDER BY sessions DESC;",SELECT day_index FROM ads_platform_daily WHERE is_full_day ORDER BY sessions DESC LIMIT 3,
+2,t03,live,What share of users were active on only one day?,correct,True,False,,"WITH user_day_counts AS (
+  SELECT user_id, COUNT(DISTINCT day_index) AS days_active
+  FROM dwd_watch_session
+  GROUP BY user_id
+)
+SELECT CAST(SUM(CASE WHEN days_active = 1 THEN 1 ELSE 0 END) AS DOUBLE) / COUNT(*) AS share_one_day_users
+FROM user_day_counts;",SELECT COUNT(*) FILTER (WHERE active_days = 1) / COUNT(*) FROM dim_user,
+2,t04,live,"How many streamers had at least 1,000 unique viewers?",correct,True,False,,"SELECT COUNT(*) as streamer_count
+FROM dim_streamer
+WHERE n_unique_viewers >= 1000;",SELECT COUNT(*) FROM dim_streamer WHERE n_unique_viewers >= 1000,
+2,t05,live,By how much did DAU change from day 20 to day 21?,correct,True,False,,"WITH day_comparison AS (
+  SELECT
+    day_index,
+    dau
+  FROM ads_platform_daily
+  WHERE day_index IN (20, 21)
+)
+SELECT
+  (SELECT dau FROM day_comparison WHERE day_index = 21) - 
+  (SELECT dau FROM day_comparison WHERE day_index = 20) AS dau_change",SELECT MAX(dau) FILTER (WHERE day_index = 21) - MAX(dau) FILTER (WHERE day_index = 20) FROM ads_platform_daily,
+2,t06,live,What was the average number of concurrent users across the 10-minute steps of day 15?,correct,True,False,,"WITH day_15_steps AS (
+  SELECT concurrent_users
+  FROM ads_platform_concurrency
+  WHERE day_index = 15
+)
+SELECT AVG(concurrent_users)::DOUBLE AS avg_concurrent_users
+FROM day_15_steps;",SELECT AVG(concurrent_users) FROM ads_platform_concurrency WHERE day_index = 15,
+2,t07,live,How many users watched more than 10 hours in total on day 5?,correct,True,False,,"SELECT COUNT(*) as user_count
+FROM dws_user_day
+WHERE day_index = 5
+  AND watch_min > 600;",SELECT COUNT(*) FROM dws_user_day WHERE day_index = 5 AND watch_min > 600,
+2,t08,live,Which streamer gained the most viewers from day 10 to day 11?,correct,False,False,,"WITH streamer_day_10_11 AS (
+  SELECT 
+    streamer,
+    SUM(CASE WHEN day_index = 10 THEN n_viewers ELSE 0 END) as viewers_day_10,
+    SUM(CASE WHEN day_index = 11 THEN n_viewers ELSE 0 END) as viewers_day_11
+  FROM dws_streamer_day
+  WHERE day_index IN (10, 11)
+  GROUP BY streamer
+)
+SELECT 
+  streamer,
+  viewers_day_10,
+  viewers_day_11,
+  viewers_day_11 - viewers_day_10 as viewer_gain
+FROM streamer_day_10_11
+ORDER BY viewer_gain DESC
+LIMIT 1",SELECT b.streamer FROM dws_streamer_day a JOIN dws_streamer_day b ON a.streamer = b.streamer AND a.day_index = 10 AND b.day_index = 11 ORDER BY b.n_viewers - a.n_viewers DESC LIMIT 1,
+2,t09,live,What is the average session length in minutes in ninja's channel?,correct,True,False,,"WITH ninja_sessions AS (
+  SELECT duration_min
+  FROM dwd_watch_session
+  WHERE streamer = 'ninja'
+)
+SELECT AVG(duration_min) AS avg_session_length_min
+FROM ninja_sessions;",SELECT AVG(duration_min) FROM dwd_watch_session WHERE streamer = 'ninja',
+2,t10,live,How many users were active on both day 0 and day 42?,correct,True,True,,"SELECT COUNT(*) AS users_active_both_days
+FROM dws_user_day d0
+WHERE d0.day_index = 0
+  AND d0.user_id IN (
+    SELECT user_id
+    FROM dws_user_day
+    WHERE day_index = 42
+  )",SELECT COUNT(*) FROM (SELECT user_id FROM dws_user_day WHERE day_index = 0 INTERSECT SELECT user_id FROM dws_user_day WHERE day_index = 42),
+2,t11,live,What is the 7-day retention of the largest cohort?,correct,True,False,,"WITH cohort_stats AS (
+  SELECT
+    cohort_day,
+    cohort_size,
+    retention_d7
+  FROM ads_user_retention
+  WHERE cohort_day > 0
+    AND retention_d7 IS NOT NULL
+  ORDER BY cohort_size DESC
+  LIMIT 1
+)
+SELECT retention_d7 FROM cohort_stats;",SELECT retention_d7 FROM ads_user_retention ORDER BY cohort_size DESC LIMIT 1,
+2,t12,live,What fraction of all watch minutes came from the top 10 streamers by watch minutes?,correct,True,False,,"WITH streamer_watch_min AS (
+  SELECT streamer, total_watch_min
+  FROM dim_streamer
+  ORDER BY total_watch_min DESC
+  LIMIT 10
+),
+top_10_total AS (
+  SELECT SUM(total_watch_min) AS top_10_watch_min
+  FROM streamer_watch_min
+),
+platform_total AS (
+  SELECT SUM(total_watch_min) AS all_watch_min
+  FROM dim_streamer
+)
+SELECT top_10_watch_min / CAST(all_watch_min AS DOUBLE) AS fraction_from_top_10
+FROM top_10_total, platform_total;",SELECT (SELECT SUM(total_watch_min) FROM (SELECT total_watch_min FROM dim_streamer ORDER BY total_watch_min DESC LIMIT 10)) / SUM(total_watch_min) FROM dim_streamer,
+2,a01,ads,Which full day had the highest ad click-through rate?,rejected,False,False,no_sql_returned,"I apologize, but I cannot answer this question based on the available schema. The tables provided do not contain any information about ad click-through rates or ad metrics. 
+
+The available tables track:
+- Watch sessions and viewing behavior (dwd_watch_session, dws_user_day, dws_streamer_day)
+- User and streamer dimensions (dim_user, dim_streamer)
+- Platform concurrency and daily metrics (ads_platform_concurrency, ads_platform_daily)
+- User retention (ads_user_retention)
+
+None of these tables include ad impressions, ad clicks, or click-through rate data. To answer your question, I would need access to an advertising metrics table that tracks ad performance.",SELECT day_index FROM ads_ad_daily WHERE is_full_day ORDER BY ctr DESC LIMIT 1,
+2,a02,ads,What was the overall CTR across the whole ad dataset?,rejected,False,False,no_sql_returned,"I don't have information about ads or click-through rates (CTR) in the provided schema. The tables contain data about streaming, viewers, watch sessions, and user retention, but there are no columns tracking ad impressions, clicks, or CTR metrics.
+
+Could you clarify what you mean by ""CTR across the whole ad dataset""? Are you looking for:
+- A metric from one of these tables that serves as a proxy for CTR?
+- Information about a different dataset that wasn't included in the schema?
+- A specific calculation based on the streaming data provided?",SELECT SUM(clicks) / SUM(impressions) FROM ads_ad_daily,
+2,a03,ads,Which campaign has the lowest CPA among campaigns that can be ranked?,rejected,False,False,no_sql_returned,"I need to analyze the schema to understand what information is available about campaigns and their costs.
+
+Looking through the tables provided, I don't see any table that contains campaign information, campaign names, or cost-per-acquisition (CPA) data. The tables focus on:
+- Watch sessions (dwd_watch_session)
+- User dimensions (dim_user)
+- Streamer dimensions (dim_streamer)
+- Daily metrics (ads_platform_daily, dws_user_day, dws_streamer_day)
+- Retention data (ads_user_retention)
+- Concurrency data (ads_platform_concurrency)
+
+None of these tables contain campaign identifiers or acquisition costs needed to calculate CPA (Cost Per Acquisition).
+
+Without access to a campaigns table or advertising/cost data, I cannot provide a valid SQL query to answer this question. Could you please clarify:
+1. Is there a campaigns table not shown in the schema?
+2. Where is the campaign and cost data stored?
+3. What defines a ""campaign"" in this context?
+
+If you can provide the missing schema information, I'll be able to write the appropriate query.",SELECT campaign_id FROM ads_ad_campaign_performance WHERE cpa_rank = 1,
+2,a04,ads,How many campaigns have enough conversions to receive a CPA rank?,rejected,False,False,no_sql_returned,"I don't see any tables related to campaigns or conversions in the provided schema. The available tables contain data about viewing sessions, streamers, users, and platform metrics for a live-streaming data warehouse, but there are no campaign or conversion tracking tables.
+
+To answer your question about CPA (Cost Per Acquisition) ranks for campaigns, I would need:
+- A campaigns table with campaign IDs
+- A conversions table with conversion events
+- Possibly a ranking or threshold definition
+
+Could you clarify if:
+1. You meant to ask a different question about the streaming data?
+2. There are additional tables not listed in the schema?
+3. You're asking about a specific metric from the available tables that relates to campaigns?",SELECT COUNT(*) FROM ads_ad_campaign_performance WHERE is_rankable,
+2,a05,ads,What was the overall conversion rate (conversions per click) on mature days?,rejected,False,False,no_sql_returned,"I need to find information about conversions and clicks on mature days, but looking at the available schema, I don't see any tables containing conversion or click data. The tables available contain:
+
+- Watch session data (dwd_watch_session)
+- User dimension data (dim_user)
+- Streamer dimension data (dim_streamer)
+- Daily platform metrics (ads_platform_daily)
+- User retention data (ads_user_retention)
+- Concurrency data (ads_platform_concurrency)
+- User and streamer daily stats (dws_user_day, dws_streamer_day)
+
+None of these tables track conversions or clicks in the traditional marketing sense. The data appears to be focused on live-streaming viewer engagement (watch time, sessions, concurrent users) rather than advertising conversion metrics.
+
+Without tables containing conversion and click data, I cannot construct a valid query to answer this question. Could you clarify:
+1. Are ""conversions"" and ""clicks"" defined within the available schema (perhaps as specific session types or user behaviors)?
+2. Should this question reference different tables than those provided?",SELECT SUM(conversions) / SUM(clicks) FROM ads_ad_daily WHERE is_mature_day,
+2,a06,ads,Which campaign accounts for the largest share of total cost?,rejected,False,False,no_sql_returned,"I don't have access to a campaign or cost table in the provided schema. The database contains streaming activity data (watch sessions, viewers, streamers, concurrency) but no information about campaigns or their associated costs.
+
+To answer this question, I would need a table that contains:
+- Campaign identifiers or names
+- Cost data associated with each campaign
+
+Could you clarify:
+1. Which table contains campaign information?
+2. How is cost represented in the schema?
+3. Should cost be linked to streamers, users, or another entity?
+
+Without this information, I cannot write a valid query.",SELECT campaign_id FROM ads_ad_campaign_performance ORDER BY share_of_cost DESC LIMIT 1,
+2,a07,ads,How many ad impressions were served on day 10?,rejected,False,False,no_sql_returned,"I don't have access to an `ads_impressions` table or any table that directly tracks ad impressions served. The available schema contains tables for:
+
+- Watch sessions and user/streamer activity
+- Daily platform metrics (DAU, PCU, sessions, watch time)
+- User retention cohorts
+- Platform concurrency by time step
+
+None of these tables record ad impressions. To answer your question, I would need a table that explicitly tracks ad serving events (e.g., `ads_impressions` or `ads_events`).
+
+If you're looking for a proxy metric like total watch time or sessions on day 10 (which could correlate with ad impressions), I can query that instead. Otherwise, please confirm whether an ads impressions table exists in your schema.",SELECT impressions FROM ads_ad_daily WHERE day_index = 10,
+2,a08,ads,How many ad clicks were there in total over days 0 to 6?,rejected,False,False,no_sql_returned,"I don't see an ads clicks table in the provided schema. The available tables track viewing sessions, user activity, streamer performance, and platform concurrency, but there is no table recording ad clicks or ad-related metrics.
+
+Based on the schema provided, I cannot answer this question. If you have access to an ads clicks table or similar, please provide its structure and I can write the appropriate query.",SELECT SUM(clicks) FROM ads_ad_daily WHERE day_index BETWEEN 0 AND 6,
+2,a09,ads,What is the median CPA among rankable campaigns?,rejected,False,False,no_sql_returned,"I don't see any tables in the schema related to campaigns or cost per acquisition (CPA) metrics. The available tables contain data about viewing sessions, streamers, users, and platform concurrency, but no advertising campaign data.
+
+To answer a question about median CPA among rankable campaigns, I would need tables with campaign information and associated cost/acquisition data, which are not present in this live-streaming data warehouse schema.
+
+Could you clarify which table should contain campaign data, or if this question applies to a different dataset?",SELECT MEDIAN(cpa) FROM ads_ad_campaign_performance WHERE is_rankable,
+2,a10,ads,Which campaign had the most clicks on day 3?,rejected,False,False,no_sql_returned,"I cannot answer this question based on the available schema. The database contains data about live-streaming viewing sessions, streamers, and user retention metrics. There are no tables containing campaign or click data.
+
+The available tables track:
+- Watch sessions (dwd_watch_session)
+- User activity (dim_user, dws_user_day)
+- Streamer activity (dim_streamer, dws_streamer_day)
+- Platform concurrency and daily metrics (ads_platform_concurrency, ads_platform_daily)
+- User retention cohorts (ads_user_retention)
+
+To answer a question about campaign clicks, you would need tables like `campaigns`, `campaign_clicks`, or similar advertising/marketing data that are not present in this schema.",SELECT campaign_id FROM dws_ad_campaign_day WHERE day_index = 3 ORDER BY clicks DESC LIMIT 1,
+2,a11,ads,How many campaigns had impressions on every full day?,rejected,False,False,no_sql_returned,"I don't have a campaigns or impressions table in the provided schema. The available tables are:
+
+- dwd_watch_session (viewing records)
+- dim_user, dim_streamer, dim_data_window
+- dws_user_day, dws_streamer_day
+- ads_platform_concurrency, ads_platform_daily
+- ads_user_retention
+
+Could you clarify what you mean by ""campaigns"" and ""impressions""? Are you asking about:
+1. Streamers who had broadcasts (streams) on every full day?
+2. Something else mapped to the available data?
+
+Without a campaigns table, I cannot write a valid query to answer this question.",SELECT COUNT(*) FROM (SELECT campaign_id FROM dws_ad_campaign_day WHERE is_full_day GROUP BY campaign_id HAVING COUNT(DISTINCT day_index) = (SELECT last_full_day + 1 FROM dim_ad_data_window)),
+2,a12,ads,"On average, how many campaigns were active per full day?",rejected,False,False,no_sql_returned,"I need to find the average number of active campaigns per full day. However, looking at the schema provided, I don't see any table that contains campaign data. The tables available are related to watch sessions, users, streamers, concurrency, and retention metrics, but there's no `campaigns` or similar table that would track campaign activity.
+
+Since the schema doesn't contain campaign information, I cannot write a valid query to answer this question. 
+
+Could you clarify:
+1. Is there a campaigns table that wasn't included in the schema?
+2. Or should I interpret ""campaigns"" as something else in this context (e.g., streams, streamers, or user cohorts)?
+
+Without the appropriate table structure, I cannot provide an accurate SQL query.",SELECT AVG(active_campaigns) FROM ads_ad_daily WHERE is_full_day,
+3,t01,live,"On full days, what was the average peak concurrent users (PCU)?",correct,True,False,,"WITH full_days AS (
+  SELECT pcu
+  FROM ads_platform_daily
+  WHERE is_full_day = true
+)
+SELECT AVG(pcu) AS avg_pcu
+FROM full_days;",SELECT AVG(pcu) FROM ads_platform_daily WHERE is_full_day,
+3,t02,live,Which 3 full days had the most viewing sessions?,correct,False,False,,"WITH full_days AS (
+  SELECT day_index, sessions
+  FROM ads_platform_daily
+  WHERE is_full_day = true
+  ORDER BY sessions DESC
+  LIMIT 3
+)
+SELECT day_index, sessions
+FROM full_days
+ORDER BY sessions DESC;",SELECT day_index FROM ads_platform_daily WHERE is_full_day ORDER BY sessions DESC LIMIT 3,
+3,t03,live,What share of users were active on only one day?,correct,True,False,,"WITH user_activity AS (
+  SELECT user_id, active_days
+  FROM dim_user
+)
+SELECT
+  CAST(SUM(CASE WHEN active_days = 1 THEN 1 ELSE 0 END) AS DOUBLE) / COUNT(*) AS share_active_one_day_only
+FROM user_activity",SELECT COUNT(*) FILTER (WHERE active_days = 1) / COUNT(*) FROM dim_user,
+3,t04,live,"How many streamers had at least 1,000 unique viewers?",correct,True,False,,"SELECT COUNT(*) AS streamer_count
+FROM dim_streamer
+WHERE n_unique_viewers >= 1000;",SELECT COUNT(*) FROM dim_streamer WHERE n_unique_viewers >= 1000,
+3,t05,live,By how much did DAU change from day 20 to day 21?,correct,True,False,,"WITH day_comparison AS (
+  SELECT
+    day_index,
+    dau
+  FROM ads_platform_daily
+  WHERE day_index IN (20, 21) AND is_full_day = true
+)
+SELECT
+  (SELECT dau FROM day_comparison WHERE day_index = 21) -
+  (SELECT dau FROM day_comparison WHERE day_index = 20) AS dau_change",SELECT MAX(dau) FILTER (WHERE day_index = 21) - MAX(dau) FILTER (WHERE day_index = 20) FROM ads_platform_daily,
+3,t06,live,What was the average number of concurrent users across the 10-minute steps of day 15?,correct,True,False,,"WITH day_15_concurrency AS (
+  SELECT concurrent_users
+  FROM ads_platform_concurrency
+  WHERE day_index = 15
+)
+SELECT AVG(concurrent_users)::DOUBLE AS avg_concurrent_users
+FROM day_15_concurrency;",SELECT AVG(concurrent_users) FROM ads_platform_concurrency WHERE day_index = 15,
+3,t07,live,How many users watched more than 10 hours in total on day 5?,correct,True,False,,"SELECT COUNT(*) AS num_users
+FROM dws_user_day
+WHERE day_index = 5
+  AND watch_min > 600;",SELECT COUNT(*) FROM dws_user_day WHERE day_index = 5 AND watch_min > 600,
+3,t08,live,Which streamer gained the most viewers from day 10 to day 11?,correct,False,False,,"WITH streamer_day_10 AS (
+  SELECT streamer, n_viewers
+  FROM dws_streamer_day
+  WHERE day_index = 10
+),
+streamer_day_11 AS (
+  SELECT streamer, n_viewers
+  FROM dws_streamer_day
+  WHERE day_index = 11
+)
+SELECT 
+  COALESCE(d11.streamer, d10.streamer) AS streamer,
+  COALESCE(d11.n_viewers, 0) - COALESCE(d10.n_viewers, 0) AS viewer_gain
+FROM streamer_day_11 d11
+FULL OUTER JOIN streamer_day_10 d10 ON d11.streamer = d10.streamer
+ORDER BY viewer_gain DESC
+LIMIT 1;",SELECT b.streamer FROM dws_streamer_day a JOIN dws_streamer_day b ON a.streamer = b.streamer AND a.day_index = 10 AND b.day_index = 11 ORDER BY b.n_viewers - a.n_viewers DESC LIMIT 1,
+3,t09,live,What is the average session length in minutes in ninja's channel?,correct,True,False,,"WITH ninja_sessions AS (
+  SELECT duration_min
+  FROM dwd_watch_session
+  WHERE streamer = 'ninja'
+)
+SELECT AVG(duration_min) AS avg_session_length_min
+FROM ninja_sessions;",SELECT AVG(duration_min) FROM dwd_watch_session WHERE streamer = 'ninja',
+3,t10,live,How many users were active on both day 0 and day 42?,wrong,False,False,row_count,"WITH day_0_users AS (
+  SELECT DISTINCT user_id
+  FROM dws_user_day
+  WHERE day_index = 0
+),
+day_42_users AS (
+  SELECT DISTINCT user_id
+  FROM dws_user_day
+  WHERE day_index = 42
+)
+SELECT COUNT(*) AS users_active_both_days
+FROM day_0_users
+INTERSECT
+SELECT COUNT(*) AS users_active_both_days
+FROM day_42_users;",SELECT COUNT(*) FROM (SELECT user_id FROM dws_user_day WHERE day_index = 0 INTERSECT SELECT user_id FROM dws_user_day WHERE day_index = 42),
+3,t11,live,What is the 7-day retention of the largest cohort?,correct,True,False,,"WITH cohort_sizes AS (
+  SELECT cohort_day, cohort_size
+  FROM ads_user_retention
+  WHERE cohort_day > 0
+  ORDER BY cohort_size DESC
+  LIMIT 1
+)
+SELECT retention_d7
+FROM ads_user_retention
+WHERE cohort_day = (SELECT cohort_day FROM cohort_sizes);",SELECT retention_d7 FROM ads_user_retention ORDER BY cohort_size DESC LIMIT 1,
+3,t12,live,What fraction of all watch minutes came from the top 10 streamers by watch minutes?,correct,True,False,,"WITH streamer_watch_min AS (
+  SELECT 
+    streamer,
+    total_watch_min,
+    ROW_NUMBER() OVER (ORDER BY total_watch_min DESC) AS rank
+  FROM dim_streamer
+),
+top_10 AS (
+  SELECT SUM(total_watch_min) AS top_10_watch_min
+  FROM streamer_watch_min
+  WHERE rank <= 10
+),
+total AS (
+  SELECT SUM(total_watch_min) AS all_watch_min
+  FROM dim_streamer
+)
+SELECT 
+  CAST(top_10.top_10_watch_min AS DOUBLE) / CAST(total.all_watch_min AS DOUBLE) AS fraction_from_top_10
+FROM top_10, total;",SELECT (SELECT SUM(total_watch_min) FROM (SELECT total_watch_min FROM dim_streamer ORDER BY total_watch_min DESC LIMIT 10)) / SUM(total_watch_min) FROM dim_streamer,
+3,a01,ads,Which full day had the highest ad click-through rate?,rejected,False,False,no_sql_returned,"I don't see an ""ad click-through rate"" column or table in the provided schema. The available tables contain metrics like DAU, PCU, sessions, watch time, retention, and concurrency, but no ad impression or click data.
+
+Based on the schema provided, I cannot answer this question. If you meant to ask about a different metric (such as the day with highest watch time, most sessions, peak concurrent users, or best retention), please clarify and I can help.",SELECT day_index FROM ads_ad_daily WHERE is_full_day ORDER BY ctr DESC LIMIT 1,
+3,a02,ads,What was the overall CTR across the whole ad dataset?,rejected,False,False,no_sql_returned,"I don't have access to an ads table with ad impressions and clicks to calculate CTR (Click-Through Rate). The schema provided contains streaming and viewership data (dwd_watch_session, dim_user, dim_streamer, etc.) and platform metrics, but no ad impression or click data.
+
+Could you clarify:
+1. Is there an ads table I should be querying that wasn't included in the schema?
+2. Or are you asking for a different metric from the available streaming data?
+
+If you're looking for engagement metrics from the streaming platform itself, I can help with those instead.",SELECT SUM(clicks) / SUM(impressions) FROM ads_ad_daily,
+3,a03,ads,Which campaign has the lowest CPA among campaigns that can be ranked?,rejected,False,False,no_sql_returned,"I don't see any campaign or advertising data in the provided schema. The tables describe viewing sessions, streamers, users, and platform metrics, but there are no tables containing campaign information, ad spend, conversions, or CPA (Cost Per Acquisition) data.
+
+To answer a question about campaign CPA, I would need access to tables that track:
+- Campaign definitions and budgets
+- Conversion events
+- Campaign attribution data
+
+Without this data in the schema, I cannot write a valid query to identify the campaign with the lowest CPA.",SELECT campaign_id FROM ads_ad_campaign_performance WHERE cpa_rank = 1,
+3,a04,ads,How many campaigns have enough conversions to receive a CPA rank?,rejected,False,False,no_sql_returned,"I need to find information about campaigns and their conversions to determine CPA (Cost Per Acquisition) ranks.
+
+However, looking at the provided schema, I don't see any tables related to campaigns, conversions, or CPA (Cost Per Acquisition) data. The schema contains:
+- `dwd_watch_session` - viewing records
+- `dim_user` - user information
+- `dim_streamer` - streamer information
+- `dim_data_window` - data window metadata
+- `dws_user_day` - daily user metrics
+- `dws_streamer_day` - daily streamer metrics
+- `ads_platform_concurrency` - concurrent users
+- `ads_platform_daily` - daily platform metrics
+- `ads_user_retention` - user retention metrics
+
+None of these tables contain campaign or conversion data needed to answer this question about CPA rankings.
+
+Based on the available schema, I cannot construct a valid query to answer this question. The data warehouse appears to be focused on live-streaming viewership metrics rather than advertising campaign performance data.
+
+If you meant to ask a question about the streaming data (such as streamer activity, user retention, or platform metrics), please rephrase your question and I'll be happy to help.",SELECT COUNT(*) FROM ads_ad_campaign_performance WHERE is_rankable,
+3,a05,ads,What was the overall conversion rate (conversions per click) on mature days?,rejected,False,False,no_sql_returned,"I don't have enough information to answer this question. The schema provided contains data about streaming viewership (watch sessions, viewer activity, streamer broadcasts) but does not include any tables or columns related to:
+
+- Clicks (ad clicks, link clicks, etc.)
+- Conversions (purchases, signups, downloads, etc.)
+- Conversion tracking or funnel data
+
+The available data is limited to:
+- User viewing sessions and watch time
+- Streamer broadcast information
+- User retention metrics
+- Platform concurrency
+
+To calculate a conversion rate (conversions per click), I would need tables containing click event data and conversion event data, which are not present in this schema.
+
+Could you clarify what ""conversions"" and ""clicks"" refer to in your context, or provide additional tables that track these metrics?",SELECT SUM(conversions) / SUM(clicks) FROM ads_ad_daily WHERE is_mature_day,
+3,a06,ads,Which campaign accounts for the largest share of total cost?,rejected,False,False,no_sql_returned,"I don't see a campaigns or costs table in the schema provided. The available tables contain streaming data (watch sessions, streamer information, user retention, and platform concurrency metrics), but no campaign or cost information.
+
+To answer your question about which campaign accounts for the largest share of total cost, I would need access to a table that contains:
+- Campaign names/IDs
+- Associated costs
+
+Could you clarify:
+1. Is there a campaigns or costs table in your schema that wasn't included?
+2. Are you asking about a different dataset than the streaming warehouse?
+
+If you can provide the relevant table schema, I'll be happy to write the SQL query.",SELECT campaign_id FROM ads_ad_campaign_performance ORDER BY share_of_cost DESC LIMIT 1,
+3,a07,ads,How many ad impressions were served on day 10?,rejected,False,False,no_sql_returned,"I don't have access to an ad impressions table in the provided schema. The available tables track user viewing sessions, streamer activity, and platform concurrency metrics, but they don't contain information about ad impressions served.
+
+To answer your question, I would need a table that records ad impressions (such as `ads_impressions` or similar) with ad serving data by day.
+
+If you're looking for a related metric that's available, I could help with:
+- Platform metrics for day 10 (DAU, sessions, watch time, etc.) from `ads_platform_daily`
+- Concurrent users on day 10 from `ads_platform_concurrency`
+- Streamer activity on day 10 from `dws_streamer_day`
+
+Could you clarify what metric you're actually looking for, or confirm if there's an ads impressions table I should be using?",SELECT impressions FROM ads_ad_daily WHERE day_index = 10,
+3,a08,ads,How many ad clicks were there in total over days 0 to 6?,rejected,False,False,no_sql_returned,"I don't see an ads_clicks table or any table tracking ad clicks in the provided schema. The available tables contain information about:
+
+- Watch sessions and viewer behavior
+- User activity and retention
+- Streamer statistics
+- Platform concurrency and daily metrics
+
+None of these tables include ad click data. Without an ads_clicks or similar table, I cannot answer this question.
+
+If you have a different question about the available data (such as watch time, concurrent users, or viewer counts for days 0-6), I'd be happy to help with that.",SELECT SUM(clicks) FROM ads_ad_daily WHERE day_index BETWEEN 0 AND 6,
+3,a09,ads,What is the median CPA among rankable campaigns?,rejected,False,False,no_sql_returned,"I don't have a campaigns table or CPA (Cost Per Acquisition) data in the provided schema. The available tables contain only viewing/streaming data (watch sessions, user activity, streamer metrics, and platform concurrency), with no advertising campaign, cost, or acquisition information.
+
+To answer this question, I would need:
+- A campaigns table with campaign identifiers and costs
+- An acquisitions or conversions table linking users/events to campaigns
+- Cost data to calculate CPA (Cost Per Acquisition)
+
+Could you clarify if this question relates to a different dataset, or if you meant to ask about streaming metrics like average watch time, viewer retention, or streamer performance?",SELECT MEDIAN(cpa) FROM ads_ad_campaign_performance WHERE is_rankable,
+3,a10,ads,Which campaign had the most clicks on day 3?,rejected,False,False,no_sql_returned,"I don't have access to campaign or click data in the available schema. The tables provided contain only streaming platform data (viewer sessions, streamer broadcasts, and platform metrics), with no information about advertising campaigns or click tracking.
+
+To answer this question, I would need access to tables containing campaign data and click events, which are not present in this data warehouse schema.
+
+If you have a question about the streaming platform data (such as viewer activity, streamer performance, or watch time on day 3), I'd be happy to help with that.",SELECT campaign_id FROM dws_ad_campaign_day WHERE day_index = 3 ORDER BY clicks DESC LIMIT 1,
+3,a11,ads,How many campaigns had impressions on every full day?,rejected,False,False,no_sql_returned,"I need to look for a campaigns table in the schema, but I don't see one. The schema provided contains tables about watch sessions, users, streamers, concurrency, retention, and daily platform metrics, but no campaigns or impressions data.
+
+Based on the available schema, I cannot answer this question as there is no campaigns or impressions table defined.
+
+However, if you meant to ask about a different metric using the available tables, please clarify. For example:
+- ""How many streamers were active on every full day?""
+- ""How many users were active on every full day?""
+
+Could you please confirm the question or provide the schema for the campaigns/impressions table?",SELECT COUNT(*) FROM (SELECT campaign_id FROM dws_ad_campaign_day WHERE is_full_day GROUP BY campaign_id HAVING COUNT(DISTINCT day_index) = (SELECT last_full_day + 1 FROM dim_ad_data_window)),
+3,a12,ads,"On average, how many campaigns were active per full day?",rejected,False,False,no_sql_returned,"I don't see a ""campaigns"" table in the provided schema. The tables describe users, streamers, watch sessions, and platform metrics, but there's no explicit campaigns table or campaigns column.
+
+Could you clarify what you mean by ""campaigns""? Are you referring to:
+1. Active streamers per day (from `ads_platform_daily.active_streamers`)?
+2. Distinct streams per day (from `dws_streamer_day.n_streams`)?
+3. Something else tracked in a different way?
+
+Once you clarify, I can write the appropriate query.",SELECT AVG(active_campaigns) FROM ads_ad_daily WHERE is_full_day,

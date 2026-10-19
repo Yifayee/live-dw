@@ -1,0 +1,47 @@
+{
+  "label": "r3_regress_gold",
+  "timestamp": "2026-10-18T15:59:46",
+  "model": "claude-haiku-4-5-20251001",
+  "question_set": "eval/gold.json",
+  "questions": 20,
+  "runs": 3,
+  "retry": true,
+  "expose_ads": true,
+  "rules_file": "eval/rules_v3.txt",
+  "prompt_sha": "eaca9e78079f",
+  "git_sha": "327b55b",
+  "exposed_tables": [
+    "dwd_watch_session",
+    "dim_user",
+    "dim_streamer",
+    "dim_data_window",
+    "dws_user_day",
+    "dws_streamer_day",
+    "ads_platform_concurrency",
+    "ads_platform_daily",
+    "ads_user_retention",
+    "dws_ad_campaign_day",
+    "dim_ad_data_window",
+    "ads_ad_daily",
+    "ads_ad_campaign_performance"
+  ],
+  "exec_accuracy_relaxed": {
+    "mean": 1.0,
+    "min": 1.0,
+    "max": 1.0,
+    "per_run": [
+      1.0,
+      1.0,
+      1.0
+    ]
+  },
+  "exec_accuracy_strict_mean": 0.7333,
+  "accuracy_by_module": {
+    "": 1.0
+  },
+  "stable_correct_questions": 20,
+  "never_correct_questions": [],
+  "error_categories": {},
+  "retries_used": 2,
+  "seconds": 59.0
+}

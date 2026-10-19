@@ -1,0 +1,551 @@
+run,id,module,question,status,strict,retried,category,pred_sql,gold_sql,error
+1,t01,live,"On full days, what was the average peak concurrent users (PCU)?",correct,True,False,,"SELECT AVG(pcu) as average_pcu
+FROM ads_platform_daily
+WHERE is_full_day = true;",SELECT AVG(pcu) FROM ads_platform_daily WHERE is_full_day,
+1,t02,live,Which 3 full days had the most viewing sessions?,correct,False,False,,"WITH full_days AS (
+  SELECT day_index, sessions
+  FROM ads_platform_daily
+  WHERE is_full_day = true
+  ORDER BY sessions DESC
+  LIMIT 3
+)
+SELECT day_index, sessions
+FROM full_days
+ORDER BY sessions DESC;",SELECT day_index FROM ads_platform_daily WHERE is_full_day ORDER BY sessions DESC LIMIT 3,
+1,t03,live,What share of users were active on only one day?,correct,True,False,,"SELECT 
+  CAST(COUNT(CASE WHEN active_days = 1 THEN 1 END) AS DOUBLE) / COUNT(*) AS share_active_one_day
+FROM dim_user;",SELECT COUNT(*) FILTER (WHERE active_days = 1) / COUNT(*) FROM dim_user,
+1,t04,live,"How many streamers had at least 1,000 unique viewers?",correct,True,False,,"SELECT COUNT(*) AS streamers_with_1000_plus_viewers
+FROM dim_streamer
+WHERE n_unique_viewers >= 1000;",SELECT COUNT(*) FROM dim_streamer WHERE n_unique_viewers >= 1000,
+1,t05,live,By how much did DAU change from day 20 to day 21?,rejected,False,False,multi_statement,"SELECT ads_platform_daily.dau AS day_21_dau - LAG(ads_platform_daily.dau) OVER (ORDER BY day_index) AS dau_change FROM ads_platform_daily WHERE day_index IN (20, 21) ORDER BY day_index;
+
+Actually, let me reconsider this more carefully:
+
+WITH day_20_21 AS (
+  SELECT day_index, dau FROM ads_platform_daily WHERE day_index IN (20, 21)
+)
+SELECT 
+  (SELECT dau FROM day_20_21 WHERE day_index = 21) - 
+  (SELECT dau FROM day_20_21 WHERE day_index = 20) AS dau_change;",SELECT MAX(dau) FILTER (WHERE day_index = 21) - MAX(dau) FILTER (WHERE day_index = 20) FROM ads_platform_daily,
+1,t06,live,What was the average number of concurrent users across the 10-minute steps of day 15?,correct,True,False,,"SELECT AVG(concurrent_users) AS avg_concurrent_users
+FROM ads_platform_concurrency
+WHERE day_index = 15;",SELECT AVG(concurrent_users) FROM ads_platform_concurrency WHERE day_index = 15,
+1,t07,live,How many users watched more than 10 hours in total on day 5?,correct,True,False,,"SELECT COUNT(*) AS num_users
+FROM dws_user_day
+WHERE day_index = 5
+  AND watch_min > 600;",SELECT COUNT(*) FROM dws_user_day WHERE day_index = 5 AND watch_min > 600,
+1,t08,live,Which streamer gained the most viewers from day 10 to day 11?,correct,False,False,,"WITH day10_viewers AS (
+  SELECT streamer, n_viewers AS viewers_day10
+  FROM dws_streamer_day
+  WHERE day_index = 10
+),
+day11_viewers AS (
+  SELECT streamer, n_viewers AS viewers_day11
+  FROM dws_streamer_day
+  WHERE day_index = 11
+)
+SELECT 
+  COALESCE(d10.streamer, d11.streamer) AS streamer,
+  COALESCE(d11.viewers_day11, 0) - COALESCE(d10.viewers_day10, 0) AS viewer_gain
+FROM day10_viewers d10
+FULL OUTER JOIN day11_viewers d11 ON d10.streamer = d11.streamer
+ORDER BY viewer_gain DESC
+LIMIT 1;",SELECT b.streamer FROM dws_streamer_day a JOIN dws_streamer_day b ON a.streamer = b.streamer AND a.day_index = 10 AND b.day_index = 11 ORDER BY b.n_viewers - a.n_viewers DESC LIMIT 1,
+1,t09,live,What is the average session length in minutes in ninja's channel?,correct,True,False,,"WITH ninja_sessions AS (
+  SELECT duration_min
+  FROM dwd_watch_session
+  WHERE streamer = 'ninja'
+)
+SELECT AVG(duration_min) AS avg_session_length_min
+FROM ninja_sessions;",SELECT AVG(duration_min) FROM dwd_watch_session WHERE streamer = 'ninja',
+1,t10,live,How many users were active on both day 0 and day 42?,rejected,False,False,multi_statement,"WITH day_0_users AS (
+  SELECT DISTINCT user_id
+  FROM dws_user_day
+  WHERE day_index = 0
+),
+day_42_users AS (
+  SELECT DISTINCT user_id
+  FROM dws_user_day
+  WHERE day_index = 42
+)
+SELECT COUNT(*) AS users_active_both_days
+FROM day_0_users
+INTERSECT
+SELECT COUNT(*)
+FROM day_42_users
+WHERE user_id IN (SELECT user_id FROM day_0_users);
+
+SELECT COUNT(DISTINCT d0.user_id) AS users_active_both_days
+FROM dws_user_day d0
+JOIN dws_user_day d42 ON d0.user_id = d42.user_id
+WHERE d0.day_index = 0 AND d42.day_index = 42;",SELECT COUNT(*) FROM (SELECT user_id FROM dws_user_day WHERE day_index = 0 INTERSECT SELECT user_id FROM dws_user_day WHERE day_index = 42),
+1,t11,live,What is the 7-day retention of the largest cohort?,correct,True,False,,"WITH cohort_stats AS (
+  SELECT
+    cohort_day,
+    cohort_size,
+    retention_d7,
+    ROW_NUMBER() OVER (ORDER BY cohort_size DESC) AS rank
+  FROM ads_user_retention
+  WHERE cohort_day > 0
+)
+SELECT retention_d7
+FROM cohort_stats
+WHERE rank = 1;",SELECT retention_d7 FROM ads_user_retention ORDER BY cohort_size DESC LIMIT 1,
+1,t12,live,What fraction of all watch minutes came from the top 10 streamers by watch minutes?,correct,True,False,,"WITH top_10_streamers AS (
+  SELECT streamer
+  FROM dim_streamer
+  ORDER BY total_watch_min DESC
+  LIMIT 10
+)
+SELECT
+  SUM(CASE WHEN ds.streamer IN (SELECT streamer FROM top_10_streamers) THEN ds.total_watch_min ELSE 0 END)::DOUBLE / SUM(ds.total_watch_min) AS fraction_from_top_10
+FROM dim_streamer ds;",SELECT (SELECT SUM(total_watch_min) FROM (SELECT total_watch_min FROM dim_streamer ORDER BY total_watch_min DESC LIMIT 10)) / SUM(total_watch_min) FROM dim_streamer,
+1,a01,ads,Which full day had the highest ad click-through rate?,correct,False,False,,"WITH daily_ctr AS (
+  SELECT 
+    day_index,
+    clicks::DOUBLE / impressions AS ctr
+  FROM ads_ad_daily
+  WHERE is_full_day
+)
+SELECT 
+  day_index,
+  ctr
+FROM daily_ctr
+ORDER BY ctr DESC
+LIMIT 1;",SELECT day_index FROM ads_ad_daily WHERE is_full_day ORDER BY ctr DESC LIMIT 1,
+1,a02,ads,What was the overall CTR across the whole ad dataset?,correct,True,False,,"SELECT clicks::DOUBLE / impressions AS ctr
+FROM (
+  SELECT SUM(clicks) AS clicks, SUM(impressions) AS impressions
+  FROM dws_ad_campaign_day
+) t;",SELECT SUM(clicks) / SUM(impressions) FROM ads_ad_daily,
+1,a03,ads,Which campaign has the lowest CPA among campaigns that can be ranked?,correct,False,False,,"SELECT campaign_id, cpa
+FROM ads_ad_campaign_performance
+WHERE is_rankable = true
+ORDER BY cpa ASC
+LIMIT 1;",SELECT campaign_id FROM ads_ad_campaign_performance WHERE cpa_rank = 1,
+1,a04,ads,How many campaigns have enough conversions to receive a CPA rank?,correct,True,False,,"SELECT COUNT(*) AS rankable_campaigns
+FROM ads_ad_campaign_performance
+WHERE is_rankable = TRUE;",SELECT COUNT(*) FROM ads_ad_campaign_performance WHERE is_rankable,
+1,a05,ads,What was the overall conversion rate (conversions per click) on mature days?,correct,True,False,,"WITH mature_data AS (
+  SELECT SUM(clicks) as total_clicks, SUM(conversions) as total_conversions
+  FROM ads_ad_daily
+  WHERE is_mature_day = true
+)
+SELECT total_conversions::DOUBLE / total_clicks as cvr
+FROM mature_data;",SELECT SUM(conversions) / SUM(clicks) FROM ads_ad_daily WHERE is_mature_day,
+1,a06,ads,Which campaign accounts for the largest share of total cost?,correct,False,False,,"SELECT campaign_id, share_of_cost
+FROM ads_ad_campaign_performance
+ORDER BY share_of_cost DESC
+LIMIT 1;",SELECT campaign_id FROM ads_ad_campaign_performance ORDER BY share_of_cost DESC LIMIT 1,
+1,a07,ads,How many ad impressions were served on day 10?,correct,True,False,,SELECT impressions FROM ads_ad_daily WHERE day_index = 10;,SELECT impressions FROM ads_ad_daily WHERE day_index = 10,
+1,a08,ads,How many ad clicks were there in total over days 0 to 6?,correct,True,False,,"SELECT SUM(clicks) AS total_clicks
+FROM ads_ad_daily
+WHERE day_index BETWEEN 0 AND 6;",SELECT SUM(clicks) FROM ads_ad_daily WHERE day_index BETWEEN 0 AND 6,
+1,a09,ads,What is the median CPA among rankable campaigns?,correct,True,False,,"WITH rankable_campaigns AS (
+  SELECT cpa
+  FROM ads_ad_campaign_performance
+  WHERE is_rankable = true AND cpa IS NOT NULL
+)
+SELECT MEDIAN(cpa) AS median_cpa
+FROM rankable_campaigns",SELECT MEDIAN(cpa) FROM ads_ad_campaign_performance WHERE is_rankable,
+1,a10,ads,Which campaign had the most clicks on day 3?,correct,False,False,,"SELECT campaign_id, clicks FROM dws_ad_campaign_day WHERE day_index = 3 ORDER BY clicks DESC LIMIT 1;",SELECT campaign_id FROM dws_ad_campaign_day WHERE day_index = 3 ORDER BY clicks DESC LIMIT 1,
+1,a11,ads,How many campaigns had impressions on every full day?,correct,True,False,,"WITH full_days AS (
+  SELECT DISTINCT day_index
+  FROM dws_ad_campaign_day
+  WHERE is_full_day
+),
+campaign_full_day_counts AS (
+  SELECT 
+    campaign_id,
+    COUNT(DISTINCT day_index) as full_days_with_impressions
+  FROM dws_ad_campaign_day
+  WHERE is_full_day AND impressions > 0
+  GROUP BY campaign_id
+),
+total_full_days AS (
+  SELECT COUNT(*) as total_full_days FROM full_days
+)
+SELECT COUNT(*) as campaigns_with_impressions_every_full_day
+FROM campaign_full_day_counts
+CROSS JOIN total_full_days
+WHERE campaign_full_day_counts.full_days_with_impressions = total_full_days.total_full_days;",SELECT COUNT(*) FROM (SELECT campaign_id FROM dws_ad_campaign_day WHERE is_full_day GROUP BY campaign_id HAVING COUNT(DISTINCT day_index) = (SELECT last_full_day + 1 FROM dim_ad_data_window)),
+1,a12,ads,"On average, how many campaigns were active per full day?",correct,True,False,,"WITH full_days AS (
+  SELECT day_index
+  FROM ads_ad_daily
+  WHERE is_full_day = true
+)
+SELECT AVG(active_campaigns)::DOUBLE AS avg_campaigns_per_full_day
+FROM ads_ad_daily
+WHERE is_full_day = true;",SELECT AVG(active_campaigns) FROM ads_ad_daily WHERE is_full_day,
+2,t01,live,"On full days, what was the average peak concurrent users (PCU)?",correct,True,False,,"WITH full_days AS (
+  SELECT pcu
+  FROM ads_platform_daily
+  WHERE is_full_day = true
+)
+SELECT AVG(pcu) AS avg_pcu
+FROM full_days;",SELECT AVG(pcu) FROM ads_platform_daily WHERE is_full_day,
+2,t02,live,Which 3 full days had the most viewing sessions?,correct,False,False,,"WITH full_days AS (
+  SELECT day_index, sessions
+  FROM ads_platform_daily
+  WHERE is_full_day = true
+  ORDER BY sessions DESC
+  LIMIT 3
+)
+SELECT day_index, sessions
+FROM full_days
+ORDER BY sessions DESC;",SELECT day_index FROM ads_platform_daily WHERE is_full_day ORDER BY sessions DESC LIMIT 3,
+2,t03,live,What share of users were active on only one day?,correct,True,False,,"WITH user_activity AS (
+  SELECT user_id, active_days
+  FROM dim_user
+)
+SELECT
+  CAST(SUM(CASE WHEN active_days = 1 THEN 1 ELSE 0 END) AS DOUBLE) / COUNT(*) AS share_active_one_day_only
+FROM user_activity;",SELECT COUNT(*) FILTER (WHERE active_days = 1) / COUNT(*) FROM dim_user,
+2,t04,live,"How many streamers had at least 1,000 unique viewers?",correct,True,False,,"SELECT COUNT(*) AS streamers_with_1000_plus_viewers
+FROM dim_streamer
+WHERE n_unique_viewers >= 1000;",SELECT COUNT(*) FROM dim_streamer WHERE n_unique_viewers >= 1000,
+2,t05,live,By how much did DAU change from day 20 to day 21?,correct,True,False,,"WITH dau_comparison AS (
+  SELECT day_index, dau
+  FROM ads_platform_daily
+  WHERE day_index IN (20, 21) AND is_full_day = true
+)
+SELECT 
+  (SELECT dau FROM dau_comparison WHERE day_index = 21) - 
+  (SELECT dau FROM dau_comparison WHERE day_index = 20) AS dau_change",SELECT MAX(dau) FILTER (WHERE day_index = 21) - MAX(dau) FILTER (WHERE day_index = 20) FROM ads_platform_daily,
+2,t06,live,What was the average number of concurrent users across the 10-minute steps of day 15?,correct,True,False,,"WITH day_15_steps AS (
+  SELECT concurrent_users
+  FROM ads_platform_concurrency
+  WHERE day_index = 15
+)
+SELECT AVG(concurrent_users) AS avg_concurrent_users
+FROM day_15_steps",SELECT AVG(concurrent_users) FROM ads_platform_concurrency WHERE day_index = 15,
+2,t07,live,How many users watched more than 10 hours in total on day 5?,correct,True,False,,"WITH day5_watch_time AS (
+  SELECT user_id, watch_min
+  FROM dws_user_day
+  WHERE day_index = 5
+)
+SELECT COUNT(*) AS num_users
+FROM day5_watch_time
+WHERE watch_min > 600;",SELECT COUNT(*) FROM dws_user_day WHERE day_index = 5 AND watch_min > 600,
+2,t08,live,Which streamer gained the most viewers from day 10 to day 11?,correct,False,False,,"WITH day_10_viewers AS (
+  SELECT streamer, n_viewers as viewers_day_10
+  FROM dws_streamer_day
+  WHERE day_index = 10
+),
+day_11_viewers AS (
+  SELECT streamer, n_viewers as viewers_day_11
+  FROM dws_streamer_day
+  WHERE day_index = 11
+)
+SELECT 
+  COALESCE(d10.streamer, d11.streamer) as streamer,
+  COALESCE(d11.viewers_day_11, 0) - COALESCE(d10.viewers_day_10, 0) as viewer_gain
+FROM day_10_viewers d10
+FULL OUTER JOIN day_11_viewers d11 ON d10.streamer = d11.streamer
+ORDER BY viewer_gain DESC
+LIMIT 1;",SELECT b.streamer FROM dws_streamer_day a JOIN dws_streamer_day b ON a.streamer = b.streamer AND a.day_index = 10 AND b.day_index = 11 ORDER BY b.n_viewers - a.n_viewers DESC LIMIT 1,
+2,t09,live,What is the average session length in minutes in ninja's channel?,correct,True,False,,"WITH ninja_sessions AS (
+  SELECT duration_min
+  FROM dwd_watch_session
+  WHERE streamer = 'ninja'
+)
+SELECT AVG(duration_min) AS avg_session_length_min
+FROM ninja_sessions;",SELECT AVG(duration_min) FROM dwd_watch_session WHERE streamer = 'ninja',
+2,t10,live,How many users were active on both day 0 and day 42?,wrong,False,False,row_count,"WITH users_day_0 AS (
+  SELECT DISTINCT user_id
+  FROM dws_user_day
+  WHERE day_index = 0
+),
+users_day_42 AS (
+  SELECT DISTINCT user_id
+  FROM dws_user_day
+  WHERE day_index = 42
+)
+SELECT COUNT(*) AS users_active_both_days
+FROM users_day_0
+INTERSECT ALL
+SELECT COUNT(*)
+FROM users_day_42
+WHERE user_id IN (SELECT user_id FROM users_day_0);",SELECT COUNT(*) FROM (SELECT user_id FROM dws_user_day WHERE day_index = 0 INTERSECT SELECT user_id FROM dws_user_day WHERE day_index = 42),
+2,t11,live,What is the 7-day retention of the largest cohort?,correct,True,False,,"WITH cohort_data AS (
+  SELECT
+    cohort_day,
+    cohort_size,
+    retention_d7
+  FROM ads_user_retention
+  WHERE cohort_day > 0
+    AND retention_d7 IS NOT NULL
+  ORDER BY cohort_size DESC
+  LIMIT 1
+)
+SELECT retention_d7
+FROM cohort_data;",SELECT retention_d7 FROM ads_user_retention ORDER BY cohort_size DESC LIMIT 1,
+2,t12,live,What fraction of all watch minutes came from the top 10 streamers by watch minutes?,correct,True,False,,"WITH streamer_watch_minutes AS (
+  SELECT
+    streamer,
+    total_watch_min,
+    ROW_NUMBER() OVER (ORDER BY total_watch_min DESC) AS rank
+  FROM dim_streamer
+),
+top_10 AS (
+  SELECT SUM(total_watch_min) AS top_10_watch_min
+  FROM streamer_watch_minutes
+  WHERE rank <= 10
+),
+total AS (
+  SELECT SUM(total_watch_min) AS all_watch_min
+  FROM dim_streamer
+)
+SELECT
+  top_10.top_10_watch_min / total.all_watch_min AS fraction
+FROM top_10, total;",SELECT (SELECT SUM(total_watch_min) FROM (SELECT total_watch_min FROM dim_streamer ORDER BY total_watch_min DESC LIMIT 10)) / SUM(total_watch_min) FROM dim_streamer,
+2,a01,ads,Which full day had the highest ad click-through rate?,correct,False,False,,"WITH full_days AS (
+  SELECT day_index, ctr
+  FROM ads_ad_daily
+  WHERE is_full_day = true
+)
+SELECT day_index, ctr
+FROM full_days
+ORDER BY ctr DESC
+LIMIT 1;",SELECT day_index FROM ads_ad_daily WHERE is_full_day ORDER BY ctr DESC LIMIT 1,
+2,a02,ads,What was the overall CTR across the whole ad dataset?,correct,True,False,,"SELECT clicks::DOUBLE / impressions AS overall_ctr
+FROM (
+  SELECT SUM(clicks) AS clicks, SUM(impressions) AS impressions
+  FROM dws_ad_campaign_day
+)",SELECT SUM(clicks) / SUM(impressions) FROM ads_ad_daily,
+2,a03,ads,Which campaign has the lowest CPA among campaigns that can be ranked?,correct,False,False,,"SELECT campaign_id, cpa
+FROM ads_ad_campaign_performance
+WHERE is_rankable = true
+ORDER BY cpa ASC
+LIMIT 1;",SELECT campaign_id FROM ads_ad_campaign_performance WHERE cpa_rank = 1,
+2,a04,ads,How many campaigns have enough conversions to receive a CPA rank?,correct,True,False,,"SELECT COUNT(*) AS rankable_campaigns
+FROM ads_ad_campaign_performance
+WHERE is_rankable = true;",SELECT COUNT(*) FROM ads_ad_campaign_performance WHERE is_rankable,
+2,a05,ads,What was the overall conversion rate (conversions per click) on mature days?,correct,True,False,,"WITH mature_days AS (
+  SELECT
+    SUM(clicks) AS total_clicks,
+    SUM(conversions) AS total_conversions
+  FROM ads_ad_daily
+  WHERE is_mature_day = true
+)
+SELECT
+  total_conversions::DOUBLE / NULLIF(total_clicks, 0) AS cvr
+FROM mature_days;",SELECT SUM(conversions) / SUM(clicks) FROM ads_ad_daily WHERE is_mature_day,
+2,a06,ads,Which campaign accounts for the largest share of total cost?,correct,False,False,,"SELECT campaign_id, share_of_cost
+FROM ads_ad_campaign_performance
+ORDER BY share_of_cost DESC
+LIMIT 1",SELECT campaign_id FROM ads_ad_campaign_performance ORDER BY share_of_cost DESC LIMIT 1,
+2,a07,ads,How many ad impressions were served on day 10?,correct,True,False,,SELECT impressions FROM ads_ad_daily WHERE day_index = 10;,SELECT impressions FROM ads_ad_daily WHERE day_index = 10,
+2,a08,ads,How many ad clicks were there in total over days 0 to 6?,correct,True,False,,"SELECT SUM(clicks) as total_clicks
+FROM ads_ad_daily
+WHERE day_index BETWEEN 0 AND 6;",SELECT SUM(clicks) FROM ads_ad_daily WHERE day_index BETWEEN 0 AND 6,
+2,a09,ads,What is the median CPA among rankable campaigns?,correct,True,False,,"WITH ranked_campaigns AS (
+  SELECT cpa
+  FROM ads_ad_campaign_performance
+  WHERE is_rankable = true AND cpa IS NOT NULL
+  ORDER BY cpa
+)
+SELECT QUANTILE_CONT(cpa, 0.5) AS median_cpa
+FROM ranked_campaigns;",SELECT MEDIAN(cpa) FROM ads_ad_campaign_performance WHERE is_rankable,
+2,a10,ads,Which campaign had the most clicks on day 3?,correct,False,False,,"SELECT campaign_id, clicks
+FROM dws_ad_campaign_day
+WHERE day_index = 3
+ORDER BY clicks DESC
+LIMIT 1;",SELECT campaign_id FROM dws_ad_campaign_day WHERE day_index = 3 ORDER BY clicks DESC LIMIT 1,
+2,a11,ads,How many campaigns had impressions on every full day?,correct,True,False,,"WITH campaign_full_days AS (
+  SELECT campaign_id, COUNT(DISTINCT day_index) as full_days_count
+  FROM dws_ad_campaign_day
+  WHERE is_full_day = true
+  GROUP BY campaign_id
+),
+total_full_days AS (
+  SELECT COUNT(DISTINCT day_index) as num_full_days
+  FROM dws_ad_campaign_day
+  WHERE is_full_day = true
+)
+SELECT COUNT(*) as campaigns_with_impressions_every_full_day
+FROM campaign_full_days
+WHERE full_days_count = (SELECT num_full_days FROM total_full_days)",SELECT COUNT(*) FROM (SELECT campaign_id FROM dws_ad_campaign_day WHERE is_full_day GROUP BY campaign_id HAVING COUNT(DISTINCT day_index) = (SELECT last_full_day + 1 FROM dim_ad_data_window)),
+2,a12,ads,"On average, how many campaigns were active per full day?",correct,True,False,,"WITH full_days_campaigns AS (
+  SELECT day_index, active_campaigns
+  FROM ads_ad_daily
+  WHERE is_full_day = true
+)
+SELECT AVG(active_campaigns) as avg_campaigns_per_full_day
+FROM full_days_campaigns;",SELECT AVG(active_campaigns) FROM ads_ad_daily WHERE is_full_day,
+3,t01,live,"On full days, what was the average peak concurrent users (PCU)?",correct,True,False,,"SELECT AVG(pcu) AS avg_pcu
+FROM ads_platform_daily
+WHERE is_full_day = true;",SELECT AVG(pcu) FROM ads_platform_daily WHERE is_full_day,
+3,t02,live,Which 3 full days had the most viewing sessions?,correct,False,False,,"WITH full_days AS (
+  SELECT day_index, sessions
+  FROM ads_platform_daily
+  WHERE is_full_day = true
+  ORDER BY sessions DESC
+  LIMIT 3
+)
+SELECT day_index, sessions
+FROM full_days
+ORDER BY sessions DESC;",SELECT day_index FROM ads_platform_daily WHERE is_full_day ORDER BY sessions DESC LIMIT 3,
+3,t03,live,What share of users were active on only one day?,correct,True,False,,"WITH user_day_counts AS (
+  SELECT user_id, COUNT(DISTINCT day_index) AS days_active
+  FROM dws_user_day
+  GROUP BY user_id
+)
+SELECT 
+  COUNT(*) FILTER (WHERE days_active = 1)::DOUBLE / COUNT(*)::DOUBLE AS share_one_day_only
+FROM user_day_counts;",SELECT COUNT(*) FILTER (WHERE active_days = 1) / COUNT(*) FROM dim_user,
+3,t04,live,"How many streamers had at least 1,000 unique viewers?",correct,True,False,,"SELECT COUNT(*) AS streamer_count
+FROM dim_streamer
+WHERE n_unique_viewers >= 1000;",SELECT COUNT(*) FROM dim_streamer WHERE n_unique_viewers >= 1000,
+3,t05,live,By how much did DAU change from day 20 to day 21?,correct,False,False,,"SELECT ads_platform_daily.dau AS day_21_dau, LAG(ads_platform_daily.dau) OVER (ORDER BY day_index) AS day_20_dau, ads_platform_daily.dau - LAG(ads_platform_daily.dau) OVER (ORDER BY day_index) AS dau_change FROM ads_platform_daily WHERE day_index IN (20, 21) ORDER BY day_index DESC LIMIT 1;",SELECT MAX(dau) FILTER (WHERE day_index = 21) - MAX(dau) FILTER (WHERE day_index = 20) FROM ads_platform_daily,
+3,t06,live,What was the average number of concurrent users across the 10-minute steps of day 15?,correct,True,False,,"WITH day_15_steps AS (
+  SELECT concurrent_users
+  FROM ads_platform_concurrency
+  WHERE day_index = 15
+)
+SELECT AVG(concurrent_users) AS avg_concurrent_users
+FROM day_15_steps;",SELECT AVG(concurrent_users) FROM ads_platform_concurrency WHERE day_index = 15,
+3,t07,live,How many users watched more than 10 hours in total on day 5?,correct,True,False,,"WITH user_watch_time AS (
+  SELECT user_id, SUM(watch_min) as total_watch_min
+  FROM dws_user_day
+  WHERE day_index = 5
+  GROUP BY user_id
+)
+SELECT COUNT(*) as num_users
+FROM user_watch_time
+WHERE total_watch_min > 600;",SELECT COUNT(*) FROM dws_user_day WHERE day_index = 5 AND watch_min > 600,
+3,t08,live,Which streamer gained the most viewers from day 10 to day 11?,correct,False,False,,"WITH streamer_viewers AS (
+  SELECT
+    streamer,
+    day_index,
+    n_viewers
+  FROM dws_streamer_day
+  WHERE day_index IN (10, 11)
+)
+SELECT
+  streamer,
+  MAX(CASE WHEN day_index = 11 THEN n_viewers ELSE 0 END) -
+  MAX(CASE WHEN day_index = 10 THEN n_viewers ELSE 0 END) AS viewer_gain
+FROM streamer_viewers
+GROUP BY streamer
+ORDER BY viewer_gain DESC
+LIMIT 1;",SELECT b.streamer FROM dws_streamer_day a JOIN dws_streamer_day b ON a.streamer = b.streamer AND a.day_index = 10 AND b.day_index = 11 ORDER BY b.n_viewers - a.n_viewers DESC LIMIT 1,
+3,t09,live,What is the average session length in minutes in ninja's channel?,correct,True,False,,"WITH ninja_sessions AS (
+  SELECT duration_min
+  FROM dwd_watch_session
+  WHERE streamer = 'ninja'
+)
+SELECT AVG(duration_min) AS avg_session_length_min
+FROM ninja_sessions;",SELECT AVG(duration_min) FROM dwd_watch_session WHERE streamer = 'ninja',
+3,t10,live,How many users were active on both day 0 and day 42?,wrong,False,False,row_count,"WITH day_0_users AS (
+  SELECT DISTINCT user_id FROM dws_user_day WHERE day_index = 0
+),
+day_42_users AS (
+  SELECT DISTINCT user_id FROM dws_user_day WHERE day_index = 42
+)
+SELECT COUNT(*) FROM day_0_users INTERSECT SELECT COUNT(*) FROM day_42_users;",SELECT COUNT(*) FROM (SELECT user_id FROM dws_user_day WHERE day_index = 0 INTERSECT SELECT user_id FROM dws_user_day WHERE day_index = 42),
+3,t11,live,What is the 7-day retention of the largest cohort?,correct,True,False,,"WITH cohort_sizes AS (
+  SELECT cohort_day, cohort_size, retention_d7
+  FROM ads_user_retention
+  WHERE cohort_day > 0
+  ORDER BY cohort_size DESC
+  LIMIT 1
+)
+SELECT retention_d7
+FROM cohort_sizes;",SELECT retention_d7 FROM ads_user_retention ORDER BY cohort_size DESC LIMIT 1,
+3,t12,live,What fraction of all watch minutes came from the top 10 streamers by watch minutes?,correct,True,False,,"WITH streamer_totals AS (
+  SELECT
+    streamer,
+    total_watch_min,
+    ROW_NUMBER() OVER (ORDER BY total_watch_min DESC) AS rank
+  FROM dim_streamer
+),
+top_10 AS (
+  SELECT SUM(total_watch_min) AS top_10_watch_min
+  FROM streamer_totals
+  WHERE rank <= 10
+),
+all_totals AS (
+  SELECT SUM(total_watch_min) AS total_watch_min
+  FROM dim_streamer
+)
+SELECT
+  top_10.top_10_watch_min / all_totals.total_watch_min AS fraction
+FROM top_10, all_totals;",SELECT (SELECT SUM(total_watch_min) FROM (SELECT total_watch_min FROM dim_streamer ORDER BY total_watch_min DESC LIMIT 10)) / SUM(total_watch_min) FROM dim_streamer,
+3,a01,ads,Which full day had the highest ad click-through rate?,correct,False,False,,"WITH daily_ctr AS (
+  SELECT
+    day_index,
+    clicks::DOUBLE / impressions AS ctr
+  FROM ads_ad_daily
+  WHERE is_full_day = true
+)
+SELECT
+  day_index,
+  ctr
+FROM daily_ctr
+ORDER BY ctr DESC
+LIMIT 1;",SELECT day_index FROM ads_ad_daily WHERE is_full_day ORDER BY ctr DESC LIMIT 1,
+3,a02,ads,What was the overall CTR across the whole ad dataset?,correct,True,False,,"SELECT CAST(SUM(clicks) AS DOUBLE) / SUM(impressions) AS overall_ctr
+FROM dws_ad_campaign_day;",SELECT SUM(clicks) / SUM(impressions) FROM ads_ad_daily,
+3,a03,ads,Which campaign has the lowest CPA among campaigns that can be ranked?,correct,False,False,,"WITH rankable_campaigns AS (
+  SELECT campaign_id, cpa
+  FROM ads_ad_campaign_performance
+  WHERE is_rankable = true
+)
+SELECT campaign_id, cpa
+FROM rankable_campaigns
+ORDER BY cpa ASC
+LIMIT 1;",SELECT campaign_id FROM ads_ad_campaign_performance WHERE cpa_rank = 1,
+3,a04,ads,How many campaigns have enough conversions to receive a CPA rank?,correct,True,False,,"SELECT COUNT(*) as campaigns_with_cpa_rank
+FROM ads_ad_campaign_performance
+WHERE is_rankable = TRUE;",SELECT COUNT(*) FROM ads_ad_campaign_performance WHERE is_rankable,
+3,a05,ads,What was the overall conversion rate (conversions per click) on mature days?,correct,True,False,,"WITH ad_totals AS (
+  SELECT
+    SUM(clicks) AS total_clicks,
+    SUM(conversions) AS total_conversions
+  FROM ads_ad_daily
+  WHERE is_mature_day = true
+)
+SELECT
+  total_conversions::DOUBLE / total_clicks AS cvr
+FROM ad_totals;",SELECT SUM(conversions) / SUM(clicks) FROM ads_ad_daily WHERE is_mature_day,
+3,a06,ads,Which campaign accounts for the largest share of total cost?,wrong,False,False,wrong_table,"WITH campaign_costs AS (
+  SELECT
+    campaign_id,
+    SUM(cost) AS total_cost
+  FROM dws_ad_campaign_day
+  GROUP BY campaign_id
+)
+SELECT
+  campaign_id,
+  total_cost,
+  total_cost / SUM(total_cost) OVER () AS share_of_cost
+FROM campaign_costs
+ORDER BY total_cost DESC
+LIMIT 1;",SELECT campaign_id FROM ads_ad_campaign_performance ORDER BY share_of_cost DESC LIMIT 1,
+3,a07,ads,How many ad impressions were served on day 10?,correct,True,False,,SELECT impressions FROM ads_ad_daily WHERE day_index = 10;,SELECT impressions FROM ads_ad_daily WHERE day_index = 10,
+3,a08,ads,How many ad clicks were there in total over days 0 to 6?,correct,True,False,,"SELECT SUM(clicks) as total_clicks
+FROM ads_ad_daily
+WHERE day_index BETWEEN 0 AND 6;",SELECT SUM(clicks) FROM ads_ad_daily WHERE day_index BETWEEN 0 AND 6,
+3,a09,ads,What is the median CPA among rankable campaigns?,correct,True,False,,"SELECT PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY cpa) AS median_cpa
+FROM ads_ad_campaign_performance
+WHERE is_rankable = true AND cpa IS NOT NULL;",SELECT MEDIAN(cpa) FROM ads_ad_campaign_performance WHERE is_rankable,
+3,a10,ads,Which campaign had the most clicks on day 3?,correct,False,False,,"SELECT campaign_id, clicks
+FROM dws_ad_campaign_day
+WHERE day_index = 3
+ORDER BY clicks DESC
+LIMIT 1;",SELECT campaign_id FROM dws_ad_campaign_day WHERE day_index = 3 ORDER BY clicks DESC LIMIT 1,
+3,a11,ads,How many campaigns had impressions on every full day?,wrong,False,False,wrong_table,"SELECT COUNT(DISTINCT campaign_id) AS campaigns_with_impressions_every_full_day
+FROM dws_ad_campaign_day
+WHERE is_full_day
+GROUP BY campaign_id
+HAVING COUNT(DISTINCT day_index) = (SELECT COUNT(DISTINCT day_index) FROM dws_ad_campaign_day WHERE is_full_day)",SELECT COUNT(*) FROM (SELECT campaign_id FROM dws_ad_campaign_day WHERE is_full_day GROUP BY campaign_id HAVING COUNT(DISTINCT day_index) = (SELECT last_full_day + 1 FROM dim_ad_data_window)),
+3,a12,ads,"On average, how many campaigns were active per full day?",correct,True,False,,"WITH full_days AS (
+  SELECT day_index
+  FROM ads_ad_daily
+  WHERE is_full_day = true
+)
+SELECT AVG(active_campaigns)::DOUBLE AS avg_campaigns_per_full_day
+FROM ads_ad_daily
+WHERE day_index IN (SELECT day_index FROM full_days);",SELECT AVG(active_campaigns) FROM ads_ad_daily WHERE is_full_day,

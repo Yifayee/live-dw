@@ -1,0 +1,89 @@
+run,id,module,question,status,strict,retried,category,pred_sql,gold_sql,error
+1,h01,,How many streams did shroud have in total?,correct,True,False,,SELECT n_streams FROM dim_streamer WHERE streamer = 'shroud';,SELECT n_streams FROM dim_streamer WHERE streamer = 'shroud',
+1,h02,,What was the total watch time in hours on day 12?,correct,True,False,,"SELECT watch_min / 60.0 AS total_watch_hours
+FROM ads_platform_daily
+WHERE day_index = 12;",SELECT watch_min / 60.0 FROM ads_platform_daily WHERE day_index = 12,
+1,h03,,"On average, how many days was each user active?",correct,True,False,,SELECT AVG(active_days) AS avg_active_days_per_user FROM dim_user;,SELECT AVG(active_days) FROM dim_user,
+1,h04,,Which streamer had the most viewers on day 30?,correct,False,False,,"SELECT streamer, n_viewers
+FROM dws_streamer_day
+WHERE day_index = 30
+ORDER BY n_viewers DESC
+LIMIT 1;",SELECT streamer FROM dws_streamer_day WHERE day_index = 30 ORDER BY n_viewers DESC LIMIT 1,
+1,h05,,How many users were first observed on day 0?,correct,True,False,,"SELECT COUNT(*) AS users_first_observed_on_day_0
+FROM dim_user
+WHERE first_day = 0;",SELECT COUNT(*) FROM dim_user WHERE first_day = 0,
+1,h06,,What is the average 7-day retention across all cohorts where it is available?,correct,True,False,,"WITH retention_available AS (
+  SELECT retention_d7
+  FROM ads_user_retention
+  WHERE retention_d7 IS NOT NULL
+)
+SELECT AVG(retention_d7) AS avg_7day_retention
+FROM retention_available;",SELECT AVG(retention_d7) FROM ads_user_retention WHERE retention_d7 IS NOT NULL,
+1,h07,,How many streamers did the average user watch over the whole period?,correct,True,False,,"WITH user_stats AS (
+  SELECT n_streamers_watched
+  FROM dim_user
+)
+SELECT AVG(n_streamers_watched)::DOUBLE AS avg_streamers_watched_per_user
+FROM user_stats;",SELECT AVG(n_streamers_watched) FROM dim_user,
+1,h08,,What was the total watch time in minutes for tfue across all days?,correct,True,False,,SELECT total_watch_min FROM dim_streamer WHERE streamer = 'tfue',SELECT total_watch_min FROM dim_streamer WHERE streamer = 'tfue',
+2,h01,,How many streams did shroud have in total?,correct,True,False,,SELECT n_streams FROM dim_streamer WHERE streamer = 'shroud';,SELECT n_streams FROM dim_streamer WHERE streamer = 'shroud',
+2,h02,,What was the total watch time in hours on day 12?,correct,True,False,,"SELECT watch_min / 60.0 AS watch_time_hours
+FROM ads_platform_daily
+WHERE day_index = 12;",SELECT watch_min / 60.0 FROM ads_platform_daily WHERE day_index = 12,
+2,h03,,"On average, how many days was each user active?",correct,True,False,,"WITH user_stats AS (
+  SELECT
+    user_id,
+    active_days
+  FROM dim_user
+)
+SELECT
+  AVG(active_days) AS avg_active_days_per_user
+FROM user_stats;",SELECT AVG(active_days) FROM dim_user,
+2,h04,,Which streamer had the most viewers on day 30?,correct,False,False,,"SELECT streamer, n_viewers
+FROM dws_streamer_day
+WHERE day_index = 30
+ORDER BY n_viewers DESC
+LIMIT 1;",SELECT streamer FROM dws_streamer_day WHERE day_index = 30 ORDER BY n_viewers DESC LIMIT 1,
+2,h05,,How many users were first observed on day 0?,correct,True,False,,"SELECT COUNT(*) AS users_first_observed_day_0
+FROM dim_user
+WHERE first_day = 0;",SELECT COUNT(*) FROM dim_user WHERE first_day = 0,
+2,h06,,What is the average 7-day retention across all cohorts where it is available?,correct,True,False,,"SELECT AVG(retention_d7) AS avg_retention_d7
+FROM ads_user_retention
+WHERE retention_d7 IS NOT NULL;",SELECT AVG(retention_d7) FROM ads_user_retention WHERE retention_d7 IS NOT NULL,
+2,h07,,How many streamers did the average user watch over the whole period?,correct,True,False,,"SELECT CAST(SUM(n_streamers_watched) AS DOUBLE) / COUNT(*) as avg_streamers_watched_per_user
+FROM dim_user;",SELECT AVG(n_streamers_watched) FROM dim_user,
+2,h08,,What was the total watch time in minutes for tfue across all days?,correct,True,False,,"SELECT total_watch_min
+FROM dim_streamer
+WHERE streamer = 'tfue';",SELECT total_watch_min FROM dim_streamer WHERE streamer = 'tfue',
+3,h01,,How many streams did shroud have in total?,correct,True,False,,SELECT n_streams FROM dim_streamer WHERE streamer = 'shroud',SELECT n_streams FROM dim_streamer WHERE streamer = 'shroud',
+3,h02,,What was the total watch time in hours on day 12?,correct,True,False,,"SELECT watch_min / 60.0 AS total_watch_time_hours
+FROM ads_platform_daily
+WHERE day_index = 12;",SELECT watch_min / 60.0 FROM ads_platform_daily WHERE day_index = 12,
+3,h03,,"On average, how many days was each user active?",correct,True,False,,"SELECT AVG(active_days) AS avg_active_days_per_user
+FROM dim_user;",SELECT AVG(active_days) FROM dim_user,
+3,h04,,Which streamer had the most viewers on day 30?,correct,False,False,,"WITH day_30_streamers AS (
+  SELECT streamer, n_viewers
+  FROM dws_streamer_day
+  WHERE day_index = 30
+)
+SELECT streamer, n_viewers
+FROM day_30_streamers
+ORDER BY n_viewers DESC
+LIMIT 1;",SELECT streamer FROM dws_streamer_day WHERE day_index = 30 ORDER BY n_viewers DESC LIMIT 1,
+3,h05,,How many users were first observed on day 0?,correct,True,False,,"SELECT COUNT(*) as users_first_observed_day_0
+FROM dim_user
+WHERE first_day = 0;",SELECT COUNT(*) FROM dim_user WHERE first_day = 0,
+3,h06,,What is the average 7-day retention across all cohorts where it is available?,correct,True,False,,"WITH retention_data AS (
+  SELECT retention_d7
+  FROM ads_user_retention
+  WHERE retention_d7 IS NOT NULL
+)
+SELECT AVG(retention_d7) AS avg_7day_retention
+FROM retention_data;",SELECT AVG(retention_d7) FROM ads_user_retention WHERE retention_d7 IS NOT NULL,
+3,h07,,How many streamers did the average user watch over the whole period?,correct,True,False,,"WITH user_stats AS (
+  SELECT n_streamers_watched
+  FROM dim_user
+)
+SELECT AVG(n_streamers_watched)
+FROM user_stats;",SELECT AVG(n_streamers_watched) FROM dim_user,
+3,h08,,What was the total watch time in minutes for tfue across all days?,correct,True,False,,SELECT total_watch_min FROM dim_streamer WHERE streamer = 'tfue',SELECT total_watch_min FROM dim_streamer WHERE streamer = 'tfue',
